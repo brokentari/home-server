@@ -1,9 +1,5 @@
-# Admin tools with no login of their own. Caddy serves them only after an Authelia sign-in
-# with 2FA, and they sit on admin_network (shared with Caddy and Homepage only) so other
-# containers can't reach them directly.
-#   Dozzle    logs.<domain>     container logs, read-only
-#   Scrutiny  disks.<domain>    SMART history for the pool drives and the NVMe
-#   Backrest  backups.<domain>  browse/restore the restic repo on R2
+# Dozzle (logs.), Scrutiny (disks.) and Backrest (backups.) have no login. Caddy serves them
+# behind Authelia, and only Caddy and Homepage share their network.
 
 services:
   dozzle:
@@ -41,8 +37,7 @@ services:
       - TZ=America/New_York
       - COLLECTOR_CRON_SCHEDULE=30 5 * * * # after the nightly backups
       - SCRUTINY_NOTIFY_URLS=${SCRUTINY_NOTIFY_URL}
-    # Drives by /dev/disk/by-id path (set in .env) so a reboot that reshuffles sdX can't swap
-    # them. collector.yaml sets the USB enclosure's device type.
+    # By id (set in .env), so a reboot can't reorder sdX
     devices:
       - ${DISK_SDA}:/dev/sda
       - ${DISK_SDB}:/dev/sdb
@@ -65,8 +60,7 @@ services:
       - diun.include_tags=^v\d+\.\d+\.\d+$$
       - diun.sort_tags=semver
       - diun.max_tags=5
-    # Same repo and keys as scripts/backup-offsite.sh, which does the backups, pruning and
-    # checks. Backrest is only for browsing and restoring.
+    # Browse and restore only; scripts/backup-offsite.sh makes the backups
     env_file: ../scripts/restic.env
     environment:
       - TZ=America/New_York
@@ -84,8 +78,7 @@ services:
       - /mnt/storage/restore:/restore
     restart: unless-stopped
 
-# Not arr_network: Backrest can read every secret in the backups, and Dozzle trusts the
-# Remote-User header, so only Caddy and Homepage share this network.
+# Not arr_network: Backrest can read every secret in the backups.
 # Create once: docker network create admin_network
 networks:
   default:

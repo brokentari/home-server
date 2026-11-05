@@ -1,5 +1,4 @@
-# Homepage: https://home.<domain> or http://<nyx-ip>:3000. No login of its own: the home
-# network and Tailscale get straight in, anyone else goes through Authelia (proxy/Caddyfile).
+# No login: the home network and Tailscale go straight in, others through Authelia
 services:
   homepage:
     image: ghcr.io/gethomepage/homepage:latest

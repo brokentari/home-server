@@ -1,5 +1,4 @@
 # yaml-language-server: $schema=https://www.authelia.com/schemas/v4.39/json-schema/configuration.json
-# Secrets are read from files in secrets/ (see docker-compose.yml).
 # After editing:  docker exec authelia authelia validate-config --config /config/configuration.yml
 #                 docker restart authelia
 
@@ -28,8 +27,7 @@ authentication_backend:
 access_control:
   default_policy: deny
   rules:
-    # Only hosts whose Caddy block has `import authelia` ever ask (Homepage only for visitors
-    # outside the home network and Tailscale). Health-check paths skip Authelia in Caddy.
+    # Only hosts with `import authelia` in the Caddyfile ask
     - domain: '*.saulreyna.com'
       subject: group:admins
       policy: two_factor
@@ -62,10 +60,8 @@ notifier:
     sender: Authelia <auth@saulreyna.com>
     subject: "[saulreyna.com] {title}"
 
-# OpenID Connect for Immich, Gitea and Vikunja. Keys and secrets come from secrets/ through the
-# template filter (X_AUTHELIA_CONFIG_FILTERS=template), so no other double braces anywhere in
-# this file, comments included. Each app has the plain client secret
-# (secrets/oidc-<app>-secret); Authelia only gets its hash (secrets/oidc-<app>-secret.digest).
+# The template filter reads the key and secret digests from secrets/, so this file must contain
+# no other double braces, comments included.
 identity_providers:
   oidc:
     jwks:

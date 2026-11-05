@@ -222,13 +222,13 @@ const STATS=[
 ];
 
 const COND={
-  disk3:['Disk 3 has logged a reallocated sector','WD20EARS. Replace it first if the count grows.'],
-  old:['Four 2 TB drives from 2009–2011','Healthy for now: low power-on hours, no pending sectors. Long term, two larger modern drives.'],
-  ups:['No UPS','A power cut is an unclean shutdown for the USB enclosure and for the Pi’s SD card. NUT is on the list.'],
-  sd:['The Pi boots from an SD card','Moving it to an SSD is on the list.'],
-  picaddy:['The Pi’s Caddy has no update path','A custom xcaddy binary and no Go on the Pi. Plan: build it from nyx’s proxy/Dockerfile.'],
-  kernel:['Kernel updates wait for a manual reboot','unattended-upgrades installs security fixes daily on both machines but never reboots.'],
-  net50:['Remote access fails from networks using the same LAN range','A common ASUS default. The tailnet route would collide with the local one.'],
+  disk3:['Disk 3 has logged a reallocated sector','WD20EARS.'],
+  old:['Four 2 TB drives from 2009–2011','Low power-on hours, no pending sectors.'],
+  ups:['No UPS','A power cut is an unclean shutdown for the USB enclosure and the Pi’s SD card.'],
+  sd:['The Pi boots from an SD card',''],
+  picaddy:['The Pi’s Caddy has no update path','It’s a custom xcaddy binary.'],
+  kernel:['Kernel updates wait for a reboot','unattended-upgrades installs security fixes daily but never reboots.'],
+  net50:['Remote access fails on networks using the same LAN range','The tailnet route collides with the local one.'],
 };
 
 const GROUPS=[['door','The front door'],['media','Media'],['data','Your data'],['watch','Keeping watch'],['safe','Kept safe']];
@@ -237,30 +237,27 @@ const S=(t)=>t.replace(/^\n/,'');
 const B=[
  /* front door */
  {id:'Z',name:'Your devices',g:'door',kind:'open',x:-7.4,y:9,w:2.6,d:1.6,h:1.1,n:'—',
-  hover:'Phone and laptops. At home they use the LAN directly; away, they join the tailnet.',
-  sub:'where every request starts',
-  what:['Every request starts here: the Jellyfin or Immich app on the phone, a browser tab on <code>home.saulreyna.com</code>, a <code>git push</code> to port 2222.',
-        'Away from home the phone is on the <mark>tailnet</mark>, so it reaches the same LAN addresses with the same certificates it uses on the couch. Nothing on the router is forwarded.'],
+  hover:'Phones and laptops. LAN at home, tailnet away.',
+  sub:'phones and laptops',
+  what:['At home they reach nyx over the LAN. Away, they join the tailnet and use the same addresses and certificates. Nothing is port-forwarded.'],
   how:{file:'README.md → Remote access, Gitea',snip:S(`
 # ~/.ssh/config on each computer
 Host git.saulreyna.com
   Port 2222
 # existing git@git.saulreyna.com:… remotes keep working`)},cond:['net50']},
  {id:'T',name:'Tailscale',g:'door',x:1,y:9,w:2,d:2,h:.55,n:'2',
-  hover:'Both nyx and the Pi advertise <home-lan>/24. One is active; the other takes over in about 15 s.',
-  sub:'two subnet routers for the home LAN',
-  what:['nyx and the Pi are both Tailscale <mark>subnet routers</mark> for <code>&lt;home-lan&gt;/24</code>. One carries the route and the other takes over automatically if it drops off.',
-        'Through the Pi, traffic arrives from a LAN address; through nyx it keeps the phone’s <code>100.x</code> Tailscale address. Caddy lets both into Homepage without a sign-in.'],
+  hover:'nyx and the Pi both route <home-lan>/24; either takes over if the other drops.',
+  sub:'two subnet routers',
+  what:['nyx and the Pi both advertise <code>&lt;home-lan&gt;/24</code>, and either takes over if the other drops. Through nyx, clients keep their <code>100.x</code> address; through the Pi they arrive from a LAN address. Caddy lets both into Homepage.'],
   how:{file:'README.md → Remote access · scripts/setup-nyx-root.sh',snip:S(`
 sudo tailscale up --advertise-routes=<home-lan>/24 --hostname=nyx
 tailscale set --auto-update
 # key expiry off, route approved in the admin console
 # --accept-routes stays off on both (they'd route their own LAN through each other)`)},cond:['net50']},
  {id:'D',name:'AdGuard Home',g:'door',host:'pi',x:4,y:-7.6,w:2,d:2,h:1.4,n:'1',
-  hover:'The home network’s DNS, on the Pi. Answers *.saulreyna.com itself, so names resolve with the internet down.',
-  sub:'DNS for the whole house, on the Pi',
-  what:['The router hands out the Pi as the DNS server. AdGuard answers <mark>*.saulreyna.com</mark> itself, so home access keeps working when the internet or Cloudflare is down.',
-        'Everything else goes upstream over DNS-over-HTTPS with the AdGuard blocklist. If the Pi is down, devices fall back to the router’s secondary DNS: no ad blocking, but the public records point at the same LAN IPs.'],
+  hover:'Home DNS on the Pi. Answers *.saulreyna.com locally.',
+  sub:'home DNS, on the Pi',
+  what:['The router hands out the Pi as DNS. AdGuard answers <code>*.saulreyna.com</code> itself, so names resolve without internet, and sends the rest upstream over DNS-over-HTTPS. If the Pi is down, clients fall back to the router’s secondary DNS.'],
   how:{file:'Pi: ~/home-server · README.md → Home DNS',snip:S(`
 *.saulreyna.com          → <nyx-ip>  (nyx)
 vw kuma ntfy adguard     → <pi-ip>  (Pi)
@@ -268,10 +265,10 @@ me                       → public DNS (Cloudflare Workers)
 everything else          → DoH: Cloudflare + Quad9
 query log + stats        → 7 days`)},cond:['sd','picaddy']},
  {id:'C',name:'Caddy',g:'door',x:4.5,y:8,w:3,d:3,h:3.2,n:'1',
-  hover:'The only thing listening on 443. One wildcard cert, one handle block per hostname.',
-  sub:'one certificate, every hostname',
-  what:['Caddy is the only thing that answers on 443. It holds <mark>one wildcard certificate</mark> for <code>*.saulreyna.com</code>, issued through the Cloudflare DNS-01 challenge, so no port is open to the internet and a new app never needs a new cert.',
-        'Each hostname is a <code>handle</code> block that proxies to a container by name over the shared <code>arr_network</code>. Homepage has no login, so Caddy sends anyone outside the home network and Tailscale to Authelia first. Any other subdomain gets its connection dropped.'],
+  hover:'Listens on 443. One wildcard cert, one handle block per hostname.',
+  sub:'reverse proxy',
+  what:['The only service on 443. One wildcard certificate covers <code>*.saulreyna.com</code>, issued over Cloudflare DNS-01, so no port has to be open to the internet.',
+        'Each hostname is a <code>handle</code> block that proxies to a container by name. Homepage sends visitors from outside the home network and Tailscale to Authelia. Unknown hostnames are dropped.'],
   how:{file:'proxy/Caddyfile · proxy/Dockerfile · proxy/docker-compose.yml',image:'caddy:2 built with caddy-dns/cloudflare (xcaddy)',ports:'80 · 443 · 443/udp (HTTP/3)',snip:S(`
 @homepage host {$HOMEPAGE_DOMAIN}
 handle @homepage {
@@ -282,19 +279,18 @@ handle @homepage {
 	reverse_proxy homepage:3000
 }`)},cond:[],
   inside:[
-   {name:'Resolve the name',desc:'AdGuard on the Pi answers every <code>*.saulreyna.com</code> name with nyx’s LAN address. Away from home, the same answer comes back and the tailnet carries the packet.',snip:'media.saulreyna.com  A  <nyx-ip>\n(DHCP reservation on the router)'},
-   {name:'Terminate TLS',desc:'One wildcard certificate covers every app. Caddy renews it over DNS-01 with a Cloudflare token, so port 80 is never needed for validation.',snip:'(cloudflare_tls) {\n\ttls {\n\t\tdns cloudflare {env.CF_API_TOKEN}\n\t}\n}\n# certs persist in proxy/data',h:1.8},
+   {name:'Resolve the name',desc:'AdGuard answers with nyx’s LAN address. Away from home, the tailnet carries the packet.',snip:'media.saulreyna.com  A  <nyx-ip>\n(DHCP reservation on the router)'},
+   {name:'Terminate TLS',desc:'The wildcard cert renews over DNS-01 with a Cloudflare token.',snip:'(cloudflare_tls) {\n\ttls {\n\t\tdns cloudflare {env.CF_API_TOKEN}\n\t}\n}\n# certs persist in proxy/data',h:1.8},
    {name:'Match the host',desc:'A named matcher per hostname picks the handle block.',snip:'@immich host {$IMMICH_DOMAIN}\nhandle @immich {\n\treverse_proxy immich_server:2283\n}'},
-   {name:'Home or sign-in',desc:'Homepage has no login. The home network and Tailscale go straight in; anyone else signs in with Authelia first.',snip:'@outside not remote_ip private_ranges 100.64.0.0/10\nroute @outside {\n\timport authelia\n}',h:1.5},
-   {name:'Proxy by name',desc:'Containers on <code>arr_network</code> are reached by container name. Jellyfin also gets compression; WebSockets are upgraded automatically.',snip:'jellyfin:8096          immich_server:2283\nocis:9200              homepage:3000\ngitea:3000             firefly:8080\nfirefly-importer:8080  vikunja:3456\nkavita:5000            speedtest-tracker:80',h:2},
-   {name:'Drop the rest',desc:'Any other subdomain that points here gets its connection dropped.',snip:'handle {\n\tabort\n}',h:.8},
+   {name:'Home or sign-in',desc:'The home network and Tailscale go straight in; everyone else signs in first.',snip:'@outside not remote_ip private_ranges 100.64.0.0/10\nroute @outside {\n\timport authelia\n}',h:1.5},
+   {name:'Proxy by name',desc:'Containers on <code>arr_network</code> are reached by name. Jellyfin gets compression and WebSockets.',snip:'jellyfin:8096          immich_server:2283\nocis:9200              homepage:3000\ngitea:3000             firefly:8080\nfirefly-importer:8080  vikunja:3456\nkavita:5000            speedtest-tracker:80',h:2},
+   {name:'Drop the rest',desc:'Unknown subdomains get their connection dropped.',snip:'handle {\n\tabort\n}',h:.8},
   ]},
  /* media */
  {id:'J',name:'Jellyfin',g:'media',x:21,y:1.5,w:4.6,d:4.6,h:2.2,n:'1',
-  hover:'Streams the library at media.saulreyna.com. Transcodes on the Intel iGPU with QuickSync.',
+  hover:'Streams the library at media.saulreyna.com with QuickSync transcoding.',
   sub:'media.saulreyna.com',
-  what:['Streams the movie and TV library. Libraries point at <code>/data/media</code> on the pool, read-only in practice.',
-        'nyx’s Intel iGPU is passed through as <code>/dev/dri</code>, so transcoding runs on <mark>QuickSync</mark> instead of the CPU.'],
+  what:['Streams the movie and TV library from <code>/data/media</code> on the pool. The Intel iGPU is passed through as <code>/dev/dri</code>, so transcoding runs on QuickSync.'],
   how:{file:'media/docker-compose.yml',image:'lscr.io/linuxserver/jellyfin:latest',ports:'8096 (Caddy: media.saulreyna.com)',snip:S(`
 jellyfin:
   volumes:
@@ -305,10 +301,10 @@ jellyfin:
     - "\${RENDER_GID}"`)},cond:[]},
  /* data */
  {id:'I',name:'Immich',g:'data',x:10,y:9.5,w:3,d:3,h:2.8,n:'4',
-  hover:'Photos at photos.saulreyna.com. Originals on the pool, Postgres on the NVMe.',
+  hover:'Photos. Originals on the pool, Postgres on the NVMe.',
   sub:'photos.saulreyna.com',
-  what:['The phone backs up every photo and video here. Originals, thumbnails and encoded video go to the pool; the database stays on the NVMe because Immich doesn’t support Postgres on FUSE filesystems like mergerfs.',
-        'Photos are the part of this house that <mark>can’t be re-downloaded</mark>. They are what the parity disk is really for.'],
+  what:['The phone backs up photos and videos here. Originals, thumbnails and encoded video go to the pool. Postgres stays on the NVMe because Immich doesn’t support it on mergerfs.',
+        'Photos can’t be replaced; they’re the main reason for the parity disk.'],
   how:{file:'immich/docker-compose.yml · immich/hwaccel.transcoding.yml',image:'immich-server, immich-machine-learning :${IMMICH_VERSION:-release} · valkey:9 · immich postgres 14 + vectorchord',ports:'2283',snip:S(`
 #   UPLOAD_LOCATION  (photos, thumbs, DB dumps) -> mergerfs pool
 #   DB_DATA_LOCATION (Postgres)                 -> local NVMe
@@ -317,18 +313,17 @@ immich-server:
     file: hwaccel.transcoding.yml
     service: quicksync`)},
   inside:[
-   {name:'immich_server',desc:'API and web app. Joins both its private network and <code>arr_network</code> so Caddy can reach it.',snip:'immich_server :2283\nnetworks: default + arr_network\nQSV transcoding via hwaccel.transcoding.yml',h:2},
-   {name:'Machine learning',desc:'Faces and smart search, on the CPU. It could move to the iGPU with the -openvino tag.',snip:'immich_machine_learning\nvolumes: model-cache:/cache'},
+   {name:'immich_server',desc:'API and web app, on its private network and <code>arr_network</code>.',snip:'immich_server :2283\nnetworks: default + arr_network\nQSV transcoding via hwaccel.transcoding.yml',h:2},
+   {name:'Machine learning',desc:'Faces and smart search, on the CPU. The -openvino tag would move it to the iGPU.',snip:'immich_machine_learning\nvolumes: model-cache:/cache'},
    {name:'Valkey',desc:'Job queues for thumbnails, encoding and ML.',snip:'docker.io/valkey/valkey:9@sha256:c123e3…\nhealthcheck: redis-cli ping',h:.9},
-   {name:'Postgres',desc:'Assets, albums and embeddings. On the NVMe, with data checksums.',snip:'ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0\nPOSTGRES_INITDB_ARGS: --data-checksums\nshm_size: 128mb',h:1.6},
-   {name:'Library on the pool',desc:'Originals, thumbnails and encoded video under <code>/mnt/storage/photos</code>, protected by snapraid parity.',snip:'${UPLOAD_LOCATION}:/data\n→ /mnt/storage/photos'},
-   {name:'Nightly DB dumps',desc:'Immich writes its own database dumps next to the library. The offsite job uploads those (not the photos) to R2.',snip:'/mnt/storage/photos/backups → restic → R2'},
+   {name:'Postgres',desc:'Assets, albums and embeddings, on the NVMe with data checksums.',snip:'ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0\nPOSTGRES_INITDB_ARGS: --data-checksums\nshm_size: 128mb',h:1.6},
+   {name:'Library on the pool',desc:'Originals, thumbnails and encoded video in <code>/mnt/storage/photos</code>, covered by parity.',snip:'${UPLOAD_LOCATION}:/data\n→ /mnt/storage/photos'},
+   {name:'Nightly DB dumps',desc:'Immich dumps its database next to the library. The offsite job uploads the dumps, not the photos.',snip:'/mnt/storage/photos/backups → restic → R2'},
   ]},
  {id:'O',name:'ownCloud Infinite Scale',g:'data',x:14.5,y:10,w:2.6,d:2.6,h:2,n:'1',
-  hover:'Documents at cloud.saulreyna.com. One container, no external database.',
+  hover:'Documents. One container, no external database.',
   sub:'cloud.saulreyna.com',
-  what:['Documents and file sync. oCIS stores files in its own format, folders named by UUID, so you reach them through the web UI, the apps or WebDAV, never by browsing the pool.',
-        'Config and metadata live on the NVMe; everyone’s files live on the pool. Login uses OIDC redirects to <code>OCIS_URL</code>, so it only works through Caddy.'],
+  what:['Documents and file sync. Files are stored by UUID, so use the web UI, the apps or WebDAV rather than the pool. Config and metadata are on the NVMe. Login redirects to <code>OCIS_URL</code>, so it only works through Caddy.'],
   how:{file:'cloud/docker-compose.yml',image:'owncloud/ocis:8',ports:'9200 (behind Caddy only)',snip:S(`
 entrypoint: ["/bin/sh"]
 command: ["-c", "ocis init || true; exec ocis server"]
@@ -337,114 +332,104 @@ volumes:
   - ./data:/var/lib/ocis
   - \${OCIS_STORAGE}:/var/lib/ocis/storage/users`)}},
  {id:'G',name:'Gitea',g:'data',x:18.5,y:10,w:2.6,d:2.6,h:2.4,n:'3',
-  hover:'git.saulreyna.com, with MySQL and an Actions runner. Git over SSH on port 2222.',
+  hover:'Git with MySQL and an Actions runner. SSH on port 2222.',
   sub:'git.saulreyna.com',
-  what:['Moved here from the Pi with its version pinned. The web UI goes through Caddy; <mark>git over SSH</mark> uses port 2222 directly.',
-        'An Actions runner executes jobs in throwaway containers on nyx’s own Docker.'],
+  what:['The web UI goes through Caddy; git over SSH uses port 2222 directly. An Actions runner runs jobs in throwaway containers on nyx’s Docker.'],
   how:{file:'gitea/docker-compose.yml · gitea/runner/config.yaml',image:'gitea:1.26.2 · mysql:8.4.9 · act_runner:0.6.1',ports:'3000 (Caddy) · 2222 → 22',snip:'gitea:\n  environment:\n    - GITEA__database__HOST=gitea-db:3306\n    - GITEA__server__SSH_PORT=2222\n  ports:\n    - 2222:22'},
   inside:[
-   {name:'Gitea',desc:'Pinned to the version that ran on the Pi. Diun reports newer x.y.z tags.',snip:'docker.gitea.com/gitea:1.26.2\ndiun.include_tags=^\\d+\\.\\d+\\.\\d+$',h:2},
-   {name:'SSH on 2222',desc:'Clone URLs show port 2222. Each computer gets one stanza in ~/.ssh/config.',snip:'ports: 2222:22\nGITEA__server__SSH_PORT=2222'},
-   {name:'MySQL 8.4 LTS',desc:'On the NVMe. Gitea waits for the healthcheck before starting.',snip:'mysql:8.4.9\ndiun.include_tags=^8\\.4\\.\\d+$   # stay on the LTS line',h:1.5},
-   {name:'Actions runner',desc:'Already registered, so no token is needed. Runs jobs through the Docker socket.',snip:'gitea/act_runner:0.6.1\n/var/run/docker.sock:/var/run/docker.sock'},
-   {name:'Nightly dump',desc:'The offsite job dumps the database and copies the SSH host keys, so clients don’t see a "host key changed" warning after a restore.',snip:'mysqldump --single-transaction … gitea | gzip\ndocker exec gitea tar -C /data -czf - ssh git/.ssh',h:1.1},
+   {name:'Gitea',desc:'Pinned version. Diun reports newer x.y.z tags.',snip:'docker.gitea.com/gitea:1.26.2\ndiun.include_tags=^\\d+\\.\\d+\\.\\d+$',h:2},
+   {name:'SSH on 2222',desc:'Clone URLs show port 2222. Each computer needs a stanza in ~/.ssh/config.',snip:'ports: 2222:22\nGITEA__server__SSH_PORT=2222'},
+   {name:'MySQL 8.4 LTS',desc:'On the NVMe. Gitea waits for its healthcheck.',snip:'mysql:8.4.9\ndiun.include_tags=^8\\.4\\.\\d+$   # stay on the LTS line',h:1.5},
+   {name:'Actions runner',desc:'Already registered. Runs jobs through the Docker socket.',snip:'gitea/act_runner:0.6.1\n/var/run/docker.sock:/var/run/docker.sock'},
+   {name:'Nightly dump',desc:'The offsite job dumps the database and copies the SSH host keys, so a restore keeps the same host key.',snip:'mysqldump --single-transaction … gitea | gzip\ndocker exec gitea tar -C /data -czf - ssh git/.ssh',h:1.1},
   ]},
  {id:'F',name:'Firefly III',g:'data',x:22.5,y:10,w:2.6,d:2.6,h:1.8,n:'5',
-  hover:'Personal finance at firefly.saulreyna.com, plus the data importer and a daily cron.',
+  hover:'Personal finance, with the data importer and a daily cron.',
   sub:'firefly.saulreyna.com · importer.saulreyna.com',
-  what:['Moved from the Pi with its settings files copied unchanged. <code>APP_KEY</code> in <code>firefly.env</code> <mark>encrypts the data</mark>: never change it, never lose it.',
-        'Images are pinned to the versions migrated from the Pi and bumped deliberately.'],
+  what:['<code>APP_KEY</code> in <code>firefly.env</code> encrypts the data. Never change or lose it. Images are pinned.'],
   how:{file:'firefly/docker-compose.yml',image:'fireflyiii/core:version-6.2.10 · mariadb:12.3.2 · redis:7.4-alpine · data-importer:version-2.3.2 · alpine:3.22',ports:'8080 (Caddy)',snip:'firefly-cron:\n  command: >-\n    echo "0 3 * * * wget -qO- http://firefly:8080/api/v1/cron/$$STATIC_CRON_TOKEN"\n    | crontab - && crond -f'},
   inside:[
-   {name:'Firefly core',desc:'The app. DB and Redis hostnames are overridden from the Pi-era settings file.',snip:'fireflyiii/core:version-6.2.10\nDB_HOST=firefly-db\nREDIS_HOST=firefly-redis',h:2},
+   {name:'Firefly core',desc:'The app. Compose sets the DB and Redis hostnames, overriding firefly.env.',snip:'fireflyiii/core:version-6.2.10\nDB_HOST=firefly-db\nREDIS_HOST=firefly-redis',h:2},
    {name:'MariaDB',desc:'On the NVMe, healthchecked before Firefly starts.',snip:'mariadb:12.3.2\nhealthcheck.sh --connect --innodb_initialized',h:1.5},
    {name:'Redis',desc:'Cache and sessions.',snip:'redis:7.4-alpine',h:.9},
    {name:'Data importer',desc:'Trusts Caddy’s forwarded headers so redirects use https://.',snip:'TRUSTED_PROXIES=**\nAPP_URL=https://importer.saulreyna.com'},
-   {name:'Daily cron',desc:'Recurring transactions and bills run at 3:00 New York time.',snip:'0 3 * * *  wget http://firefly:8080/api/v1/cron/$STATIC_CRON_TOKEN',h:1},
+   {name:'Daily cron',desc:'Recurring transactions and bills at 3:00.',snip:'0 3 * * *  wget http://firefly:8080/api/v1/cron/$STATIC_CRON_TOKEN',h:1},
   ]},
  {id:'X1',name:'Vikunja',g:'data',sub2:'apps',x:10,y:15,w:1.6,d:1.6,h:1.2,n:'1',
-  hover:'To-do lists at todo.saulreyna.com. SQLite on the NVMe, email through Mailjet.',sub:'todo.saulreyna.com',
-  what:['To-do lists. A single container with its SQLite database on the NVMe and reminder emails sent through Mailjet.'],
+  hover:'To-do lists. SQLite on the NVMe.',sub:'todo.saulreyna.com',
+  what:['To-do lists. One container, SQLite on the NVMe, reminder emails through Mailjet.'],
   how:{file:'apps/docker-compose.yml',image:'vikunja/vikunja:2.1.0',ports:'3456 (Caddy)',snip:'VIKUNJA_DATABASE_PATH: /db/vikunja.db\nVIKUNJA_MAILER_HOST: in-v3.mailjet.com'}},
  {id:'X2',name:'Kavita',g:'data',sub2:'apps',x:12.3,y:15,w:1.6,d:1.6,h:1.2,n:'1',
-  hover:'Books and comics at kavita.saulreyna.com. The library is on the pool.',sub:'kavita.saulreyna.com',
-  what:['Books and comics. Its database and covers stay on the NVMe; the library itself is <code>/mnt/storage/data/media/books</code>.'],
+  hover:'Books and comics. Library on the pool.',sub:'kavita.saulreyna.com',
+  what:['Books and comics. Database and covers on the NVMe; the library is <code>/mnt/storage/data/media/books</code>.'],
   how:{file:'apps/docker-compose.yml',image:'lscr.io/linuxserver/kavita:v0.9.0.2-ls111',ports:'5000 (Caddy)',snip:'volumes:\n  - ./kavita/config:/config\n  - /mnt/storage/data/media/books:/library'}},
  {id:'X3',name:'Speedtest Tracker',g:'data',sub2:'apps',x:14.6,y:15,w:1.6,d:1.6,h:1.2,n:'1',
-  hover:'Runs a speed test every two hours at :06. speed.saulreyna.com',sub:'speed.saulreyna.com',
-  what:['Measures the home connection every two hours and charts it.'],
+  hover:'A speed test every two hours.',sub:'speed.saulreyna.com',
+  what:['Measures the connection every two hours and charts it.'],
   how:{file:'apps/docker-compose.yml',image:'lscr.io/linuxserver/speedtest-tracker:1.14.3',ports:'80 (Caddy)',snip:'SPEEDTEST_SCHEDULE=6 */2 * * *   # every 2 hours at :06\nDB_CONNECTION=sqlite'}},
  /* watch */
  {id:'H',name:'Homepage',g:'watch',x:4.5,y:14,w:2.6,d:2.6,h:1.6,n:'1',
-  hover:'The landing page with live status for every service. Authelia sign-in from outside the home network and Tailscale.',sub:'home.saulreyna.com',
-  what:['Links and live widgets for every service on nyx. It reads container status from the Docker socket (read-only) and pool usage from <code>/mnt/storage</code>.',
-        'It has no login, so Caddy only serves it to <mark>private IPs</mark>. The tailnet counts, because its traffic arrives from a LAN address.'],
+  hover:'Links and live status for every service.',sub:'home.saulreyna.com',
+  what:['Links and live widgets for every service. Container status comes from the Docker socket and pool usage from <code>/mnt/storage</code>.',
+        'It has no login. Caddy lets the home network and Tailscale in and sends everyone else to Authelia.'],
   how:{file:'dashboard/docker-compose.yml · dashboard/config/services.yaml',image:'ghcr.io/gethomepage/homepage:latest',ports:'3000',snip:'volumes:\n  - ./config:/app/config\n  - /var/run/docker.sock:/var/run/docker.sock:ro\n  - /mnt/storage:/mnt/storage:ro   # disk widget only'}},
  {id:'DN',name:'Diun',g:'watch',x:1.4,y:17.6,w:1.8,d:1.8,h:1.1,n:'2',
-  hover:'Saturdays at 9:00: checks for new image versions and posts to ntfy. Never updates anything.',sub:'one on nyx, one on the Pi',
-  what:['Diun reports, you decide. Images on a moving tag (<code>latest</code>, <code>v3</code>, <code>8</code>) are reported when the tag gets a new image; pinned images use <code>diun.*</code> labels to report newer version tags.',
-        'Caddy is built locally, so Diun watches its base image <code>caddy:2</code> instead.'],
+  hover:'Saturday 9:00 check for new images, posted to ntfy.',sub:'one on nyx, one on the Pi',
+  what:['Reports new images and never updates anything. Moving tags (<code>latest</code>, <code>v3</code>, <code>8</code>) are reported when they change; pinned images use <code>diun.*</code> labels to find newer version tags. Caddy is built locally, so Diun watches <code>caddy:2</code>.'],
   how:{file:'diun/docker-compose.yml · diun/images.yml',image:'crazymax/diun:4.33.0',snip:'DIUN_WATCH_SCHEDULE=0 9 * * 6\nDIUN_NOTIF_NTFY_ENDPOINT=https://ntfy.saulreyna.com\nDIUN_NOTIF_NTFY_TOPIC=updates'}},
  {id:'K',name:'Uptime Kuma',g:'watch',host:'pi',x:10,y:-7.6,w:2,d:2,h:1.4,n:'1',
-  hover:'Watches everything on nyx from the Pi, so it still alerts when nyx is down.',sub:'kuma.saulreyna.com · on the Pi',
-  what:['Kuma lives on the Pi <mark>on purpose</mark>: if nyx goes down, the thing that notices is still up.',
-        'Its Backups group holds push monitors. They go down if a backup script hasn’t reported success within 25 hours.'],
+  hover:'Watches nyx from the Pi, so it still alerts when nyx is down.',sub:'kuma.saulreyna.com · on the Pi',
+  what:['Runs on the Pi so it can alert when nyx is down. Its Backups group has push monitors that go down if a backup hasn’t reported success in 25 hours.'],
   how:{file:'scripts/notify.sh · README.md → Notifications',snip:'kuma_push() {\n  curl -fsS -m 20 -G --data-urlencode "status=up" --data-urlencode "msg=$2" \\\n    "https://kuma.saulreyna.com/api/push/$1"\n}'},cond:['sd','picaddy']},
  {id:'N',name:'ntfy',g:'watch',host:'pi',x:13,y:-7.6,w:2,d:2,h:1.4,n:'1',
-  hover:'Phone notifications. Deny-all; a write-only publisher token for scripts.',sub:'ntfy.saulreyna.com · on the Pi',
-  what:['Every alert in the house ends up here: <code>alerts</code> (Kuma), <code>backups</code>, <code>disks</code> (smartd) and <code>updates</code> (Diun).',
-        'Access is deny-all. The phone logs in as <code>saul</code>; scripts use a <mark>write-only</mark> publisher token. ntfy.sh only relays a poll ping for instant iOS push, never the message.'],
+  hover:'Phone notifications. Deny-all; scripts use a write-only token.',sub:'ntfy.saulreyna.com · on the Pi',
+  what:['Topics: <code>alerts</code> (Kuma), <code>backups</code>, <code>disks</code> (smartd) and <code>updates</code> (Diun). Access is deny-all: the phone logs in as <code>saul</code> and scripts use a write-only token. ntfy.sh only relays a poll ping for iOS push.'],
   how:{file:'scripts/notify.sh',snip:'ntfy() {\n  curl -fsS -m 20 -H "Authorization: Bearer $NTFY_TOKEN" -H "Title: $2" \\\n    -H "Priority: ${4:-default}" -d "$3" "$NTFY_URL/$1"\n}'},cond:['sd','picaddy']},
  /* safe */
  {id:'V',name:'Vaultwarden',g:'safe',host:'pi',x:7,y:-7.6,w:2,d:2,h:1.4,n:'1',
-  hover:'Passwords, on the Pi. nyx pulls a consistent snapshot every night at 3:15.',sub:'vw.saulreyna.com · on the Pi',
-  what:['The password vault, including the restic password that decrypts the offsite backups.',
-        'Every night nyx connects over SSH, has Vaultwarden take an <mark>online backup</mark> of its own database, and streams it back as a tarball onto the pool.'],
+  hover:'Passwords, on the Pi. Backed up to nyx at 3:15.',sub:'vw.saulreyna.com · on the Pi',
+  what:['The password vault, including the restic password. Each night nyx has it take an online backup over SSH and stores the archive on the pool.'],
   how:{file:'scripts/backup-vaultwarden.sh',snip:'ssh saul@<pi-ip> \'docker exec vaultwarden sh -euc "\n  /vaultwarden backup >&2\n  tar -C /data -czf - --exclude=./db.sqlite3 … ."\''},cond:['sd','picaddy']},
  {id:'M',name:'Storage pool',g:'safe',kind:'stack',layers:3,x:17,y:15.5,w:6,d:4.5,h:.42,gap:.16,n:'3',
-  hover:'Three 2 TB disks merged into /mnt/storage with mergerfs, in a TerraMaster USB enclosure.',sub:'/mnt/storage · mergerfs over disk1–3',
-  what:['Three disks merged into one tree with <mark>mergerfs</mark>. Media, photos, oCIS files and backups live here. Databases and oCIS metadata never do.',
-        'Docker won’t start until the pool is mounted, so a container can’t quietly write into the empty mountpoint on the NVMe.'],
+  hover:'Three 2 TB disks merged into /mnt/storage with mergerfs.',sub:'/mnt/storage · mergerfs over disk1–3',
+  what:['mergerfs merges three disks into one tree for media, photos, oCIS files and backups. Databases and oCIS metadata stay off it. Docker waits for the pool to mount, so containers never write into the empty mountpoint.'],
   how:{file:'README.md → Storage · One-time setup',snip:'/mnt/storage/\n├── data/      downloads/{tv,movies} · media/{tv,movies,books}\n├── photos/    Immich library + nightly DB dumps\n├── cloud/     oCIS user files\n└── backups/   vaultwarden/ · dumps/ · offsite.log\n\n[Unit]\nRequiresMountsFor=/mnt/storage   # docker.service.d/storage.conf'},cond:['disk3','old','ups'],
   inside:[
    {name:'disk1',desc:'2 TB WD, data.',snip:'/mnt/disk1  (data)',h:1},
    {name:'disk2',desc:'2 TB WD, data.',snip:'/mnt/disk2  (data)',h:1},
-   {name:'disk3',desc:'2 TB WD20EARS, data. One reallocated sector logged: the first to replace if the count grows.',snip:'/mnt/disk3  WD20EARS\nreallocated sectors: 1',h:1,flag:true},
-   {name:'mergerfs',desc:'Presents the three as one tree.',snip:'/mnt/storage  ← disk1 + disk2 + disk3',h:1.6},
-   {name:'snapraid sync',desc:'At 3:30 a systemd timer computes parity onto the fourth disk. Downloads are excluded.',snip:'03:30  snapraid sync → /mnt/parity1\nexclude data/downloads/',h:1.3},
-   {name:'smartd',desc:'Short self-test daily at 2:00, long test Saturdays at 3:00, alerts above 45°C or on new bad sectors.',snip:'-W 4,45,55 -m <nomailer> -M exec /usr/local/bin/smartd-ntfy\n→ ntfy topic "disks", priority urgent'},
+   {name:'disk3',desc:'2 TB WD20EARS, data. One reallocated sector logged.',snip:'/mnt/disk3  WD20EARS\nreallocated sectors: 1',h:1,flag:true},
+   {name:'mergerfs',desc:'Presents the three disks as one tree.',snip:'/mnt/storage  ← disk1 + disk2 + disk3',h:1.6},
+   {name:'snapraid sync',desc:'Parity onto the fourth disk at 3:30. Downloads are excluded.',snip:'03:30  snapraid sync → /mnt/parity1\nexclude data/downloads/',h:1.3},
+   {name:'smartd',desc:'Short test daily at 2:00, long test Saturdays at 3:00. Alerts above 45°C or on new bad sectors.',snip:'-W 4,45,55 -m <nomailer> -M exec /usr/local/bin/smartd-ntfy\n→ ntfy topic "disks", priority urgent'},
   ]},
  {id:'PA',name:'Parity disk',g:'safe',x:24.3,y:16,w:1.8,d:3.2,h:1.3,n:'—',
-  hover:'snapraid parity for disk1–3, synced nightly at 3:30. Survives a dead drive, not a deletion.',sub:'/mnt/parity1 · snapraid',
-  what:['If one data disk dies, snapraid can rebuild it from the other two plus this one. It is <mark>not a backup</mark>: a deleted file is gone from parity after the next sync.'],
+  hover:'SnapRAID parity for disk1–3, synced at 3:30.',sub:'/mnt/parity1 · snapraid',
+  what:['SnapRAID can rebuild a dead data disk from the other two plus this one. It isn’t a backup: a deleted file leaves parity at the next sync.'],
   how:{file:'README.md → Backups',snip:'03:30  snapraid sync (systemd timer)\nexclude: data/downloads/'},cond:['old']},
  {id:'E',name:'NVMe',g:'safe',x:11,y:19.2,w:3.6,d:1.8,h:.45,n:'—',
-  hover:'The system disk. App configs and every database live here, never on mergerfs.',sub:'WD SN720 256 GB · system disk',
-  what:['Every database stays on the NVMe: Immich’s Postgres, Gitea’s MySQL, Firefly’s MariaDB, oCIS metadata and the SQLite files. <mark>Databases must not go on mergerfs.</mark>',
-        'smartd watches it too, with NVMe temperature limits.'],
+  hover:'System disk. Configs and every database live here.',sub:'WD SN720 256 GB · system disk',
+  what:['Holds Immich’s Postgres, Gitea’s MySQL, Firefly’s MariaDB, oCIS metadata and the SQLite files. smartd watches it with NVMe temperature limits.'],
   how:{file:'README.md → Storage · scripts/setup-nyx-root.sh',snip:'*/config  immich/postgres  cloud/config  cloud/data\ngitea/db  firefly/db  apps/*\n\nnvme-WDC_PC_SN720_SDAQNTW-256G… -a -W 0,70,80'}},
  {id:'B',name:'Backup jobs',g:'safe',x:6.5,y:18.5,w:2.6,d:2.6,h:1.8,n:'cron',
-  hover:'3:15 pull Vaultwarden from the Pi; 4:30 dump every database and ship a restic snapshot to R2.',sub:'scripts/ · saul’s crontab on nyx',
-  what:['Two scripts, one rule: <mark>only small, irreplaceable data</mark> goes offsite. Movies, TV, books and the photos themselves stay home.',
-        'Each step names itself, so a failure alert says which step broke and the last error it printed. Success pings a Kuma push monitor; silence for 25 hours is its own alert.'],
+  hover:'3:15 Vaultwarden pull; 4:30 database dumps and a restic snapshot to R2.',sub:'scripts/ · saul’s crontab on nyx',
+  what:['Only small, irreplaceable data goes offsite; media and the photos themselves stay home. A failure alert names the step and its last error. Success pings a Kuma push monitor.'],
   how:{file:'scripts/backup-offsite.sh · scripts/backup-vaultwarden.sh · scripts/restic-excludes.txt',snip:'restic backup --tag nightly \\\n  --exclude-file restic-excludes.txt --exclude-larger-than 100M \\\n  /home/saul/home-server /mnt/storage/backups /mnt/storage/photos/backups'},
   inside:[
-   {name:'Vaultwarden pull',desc:'03:15. Snapshot on the Pi, stream it over SSH, check the archive has the DB snapshot and rsa_key.pem, keep 30 days.',snip:'vaultwarden-2026-10-20_0315.tar.gz\ndb_*.sqlite3 · rsa_key.pem · config.json · attachments/ · sends/',h:1.5},
-   {name:'Gitea dump',desc:'04:30 starts here. Written to .part and kept only if the dump says it completed.',snip:'mysqldump --single-transaction --routines --triggers --events gitea\n| gzip > gitea.sql.gz.part   # "Dump completed" check'},
-   {name:'Firefly dump',desc:'Same pattern for MariaDB.',snip:'mariadb-dump --single-transaction --routines --triggers\n| gzip > firefly.sql.gz.part'},
-   {name:'Gitea SSH keys',desc:'Root-only inside the container, so they are copied out separately.',snip:'docker exec gitea tar -C /data -czf - ssh git/.ssh',h:.9},
-   {name:'SQLite copies',desc:'SQLite’s online backup API gives consistent copies of every database under home-server while the apps keep running.',snip:'s = sqlite3.connect(src, timeout=60)\nd = sqlite3.connect(out + ".part")\ns.backup(d)'},
-   {name:'oCIS mirror',desc:'oCIS has no dump tool, so it is stopped for a few seconds while config, metadata and files are mirrored.',snip:'docker stop ocis\nrsync -a --delete --max-size=100M …\ndocker start ocis',h:1.1},
-   {name:'Pi configs',desc:'Compose file, Caddyfile and .env from the Pi, plus consistent copies of the Kuma and ntfy databases.',snip:'tar -czf - docker-compose.yaml caddy/Caddyfile .env\nkuma.db · ntfy-user.db  → pi/dbs.tar.gz'},
-   {name:'Upload to R2',desc:'One restic snapshot of configs, secrets, dumps and Immich’s DB dumps. Exit 3 means some files were unreadable and sends a softer warning.',snip:'repo: Cloudflare R2  bucket nyx-backups  path /nyx\nrestic backup --tag nightly …',h:2},
-   {name:'Retention',desc:'Keep 7 daily, 5 weekly, 12 monthly. Data is only pruned on Sundays.',snip:'restic forget --keep-daily 7 --keep-weekly 5 --keep-monthly 12 [--prune on Sun]'},
-   {name:'Monthly check',desc:'On the 1st, re-download and verify 5% of the stored data.',snip:'restic check --read-data-subset=5%',h:.9},
-   {name:'Report',desc:'Success pings Kuma with the size added. Any failed step sends a high-priority ntfy alert instead.',snip:'kuma_push "$KUMA_PUSH_OFFSITE" "OK, added …"\n# or: ntfy backups "Offsite backup FAILED" "<step> failed: <reason>"'},
+   {name:'Vaultwarden pull',desc:'03:15. Snapshot on the Pi, stream it over SSH, check for the DB snapshot and rsa_key.pem, keep 30 days.',snip:'vaultwarden-2026-10-20_0315.tar.gz\ndb_*.sqlite3 · rsa_key.pem · config.json · attachments/ · sends/',h:1.5},
+   {name:'Gitea dump',desc:'04:30. Kept only if the dump completed.',snip:'mysqldump --single-transaction --routines --triggers --events gitea\n| gzip > gitea.sql.gz.part   # "Dump completed" check'},
+   {name:'Firefly dump',desc:'Same for MariaDB.',snip:'mariadb-dump --single-transaction --routines --triggers\n| gzip > firefly.sql.gz.part'},
+   {name:'Gitea SSH keys',desc:'Root-only in the container, so copied separately.',snip:'docker exec gitea tar -C /data -czf - ssh git/.ssh',h:.9},
+   {name:'SQLite copies',desc:'Consistent copies of every SQLite database, taken while the apps run.',snip:'s = sqlite3.connect(src, timeout=60)\nd = sqlite3.connect(out + ".part")\ns.backup(d)'},
+   {name:'oCIS mirror',desc:'oCIS has no dump tool, so it stops for a few seconds while its files are mirrored.',snip:'docker stop ocis\nrsync -a --delete --max-size=100M …\ndocker start ocis',h:1.1},
+   {name:'Pi configs',desc:'The Pi’s compose file, Caddyfile and .env, plus the Kuma and ntfy databases.',snip:'tar -czf - docker-compose.yaml caddy/Caddyfile .env\nkuma.db · ntfy-user.db  → pi/dbs.tar.gz'},
+   {name:'Upload to R2',desc:'One restic snapshot. Exit 3 (unreadable files) sends a softer warning.',snip:'repo: Cloudflare R2  bucket nyx-backups  path /nyx\nrestic backup --tag nightly …',h:2},
+   {name:'Retention',desc:'7 daily, 5 weekly, 12 monthly. Prunes on Sundays.',snip:'restic forget --keep-daily 7 --keep-weekly 5 --keep-monthly 12 [--prune on Sun]'},
+   {name:'Monthly check',desc:'On the 1st, verify 5% of the stored data.',snip:'restic check --read-data-subset=5%',h:.9},
+   {name:'Report',desc:'Success pings Kuma; a failure sends a high-priority ntfy alert.',snip:'kuma_push "$KUMA_PUSH_OFFSITE" "OK, added …"\n# or: ntfy backups "Offsite backup FAILED" "<step> failed: <reason>"'},
   ]},
  {id:'R2',name:'Cloudflare R2',g:'safe',kind:'open',x:31,y:14.5,w:3,d:3,h:1.6,n:'—',
-  hover:'Offsite restic repository, bucket nyx-backups. Encrypted; the password is also in Vaultwarden.',sub:'bucket nyx-backups · path /nyx',
-  what:['The copy that survives the house. A restic repository, <mark>encrypted</mark> before it leaves nyx.',
-        'The password is in <code>scripts/restic-password</code> and in Vaultwarden. Without it the backups can’t be decrypted.'],
+  hover:'Offsite restic repository. Encrypted; the password is also in Vaultwarden.',sub:'bucket nyx-backups · path /nyx',
+  what:['A restic repository, encrypted before it leaves nyx. The password is in <code>scripts/restic-password</code> and in Vaultwarden.'],
   how:{file:'scripts/restic.env · README.md → Backups',snip:'set -a; . scripts/restic.env; set +a\nrestic snapshots\nrestic restore latest --target /tmp/restore \\\n  --include /mnt/storage/backups/dumps'}},
 ];
 
@@ -746,25 +731,25 @@ function renderPanel(){
       const w=b.how||{};
       h+=`<h2>Where it lives</h2>`+kv([['Files',w.file],['Images',w.image],['Ports',w.ports],['Containers',b.n!=='—'?b.n:'']]);
       if(w.snip)h+=`<h2>From the config</h2><pre class="snip">${esc(w.snip)}</pre>`;
-      if(!w.file&&!w.snip)h+=`<p>Nothing in the repo configures this; it sits outside the house.</p>`;
+      if(!w.file&&!w.snip)h+=`<p>Not configured in this repo.</p>`;
     }
   } else {
-    h+=`<div class="lab">brokentari / home-server</div><h1>The Home Server</h1><p class="sub">how a request, a photo and a backup move through nyx and the Pi</p>`;
+    h+=`<div class="lab">brokentari / home-server</div><h1>The Home Server</h1><p class="sub">requests, photos and backups through nyx and the Pi</p>`;
     if(tab==='what'){
       h+=`<h2>What this is</h2>
-      <p>This repository is <mark>one Compose project per folder</mark> on nyx, an Intel NUC under the desk, plus a Raspberry Pi that runs DNS, passwords and the watchers. Every web-facing container joins one shared network so a single Caddy can reach it by name.</p>
-      <p>Read the map from the left. Requests enter through <mark>the front door</mark> (your devices, Tailscale, AdGuard, Caddy). Jellyfin sits on the right, your data runs through the middle, the disks along the bottom, and the copy that leaves the house sits off to the right in R2. The Pi floats above, on purpose: it is the part that is still awake when nyx isn’t.</p>
-      <p>Nearly every decision here is about <mark>what can’t be replaced</mark>. The movie library can be rebuilt; photos, the vault and the finance database can’t. So databases stay on the NVMe, photos get parity, and only small irreplaceable data goes offsite.</p>
+      <p>One Compose project per folder on nyx, an Intel NUC, plus a Raspberry Pi for DNS, passwords and monitoring. Web-facing containers share one network so Caddy can reach them by name.</p>
+      <p>Requests come in from the left through your devices, Tailscale, AdGuard and Caddy. Jellyfin is on the right, your data through the middle, the disks along the bottom, and R2 off to the right. The Pi is drawn above nyx.</p>
+      <p>Photos, the vault and the finance database can’t be replaced; the movie library can. So databases stay on the NVMe, photos get parity, and only small irreplaceable data goes offsite.</p>
       <h2>How to read it</h2>
-      <p>Hover anything for a plain description. The <button class="inline" data-act="how">How it’s built</button> tab gives the files and config behind it, and <span class="mk">Condition</span> lists what is currently wrong with it. A <button class="inline" data-act="in-C">→ goes inside</button> on a structure shows its steps in execution.</p>
-      <p>The moving dots are data: a DNS answer, a video stream, a photo, a backup. Click one to read the snippet it carries, then <button class="inline" data-act="step">Trace one step</button> to follow it hop by hop.</p>
+      <p>Hover for a description. <button class="inline" data-act="how">How it’s built</button> shows the files and config, and <span class="mk">Condition</span> lists known problems. <button class="inline" data-act="in-C">→ goes inside</button> shows a structure’s steps.</p>
+      <p>The moving dots are data (a DNS answer, a video stream, a photo, a backup). Click one to read its snippet, or <button class="inline" data-act="step">Trace one step</button> to follow it.</p>
       <h2>Condition</h2>`+condHTML(['disk3','ups','sd','picaddy','old','kernel']);
     } else {
       h+=`<h2>The folders</h2><table class="folders"><tbody>`+FOLDERS.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td class="n">${r[2]}</td></tr>`).join('')+`</tbody></table>`;
       h+=`<h2>Shared network</h2><pre class="snip">docker network create --subnet <docker-subnet> arr_network\n# fixed subnet: a firewall rule in media/ depends on it</pre>`;
-      h+=`<h2>Start order</h2><pre class="snip">for s in proxy media immich cloud gitea firefly apps dashboard diun; do\n  (cd ~/home-server/$s && docker compose up -d --build)\ndone</pre>`;
-      h+=`<h2>Adding an app</h2><p>Create its A record in Cloudflare, add a <code>handle</code> block to <code>proxy/Caddyfile</code>, reload Caddy, and add an Uptime Kuma monitor. The wildcard cert and AdGuard’s wildcard answer already cover it.</p>`;
-      h+=`<h2>Secrets</h2><p>The repo is an allowlist: configs only, never <code>.env</code>, secrets or data. Each stack ships a <code>*.env.example</code> with the values removed.</p>`;
+      h+=`<h2>Start order</h2><pre class="snip">for s in proxy auth media immich cloud gitea firefly apps admin dashboard diun; do\n  (cd ~/home-server/$s && docker compose up -d --build)\ndone</pre>`;
+      h+=`<h2>Adding an app</h2><p>Add an A record in Cloudflare and a <code>handle</code> block in <code>proxy/Caddyfile</code>, restart Caddy, and add an Uptime Kuma monitor.</p>`;
+      h+=`<h2>Secrets</h2><p>Configs only: no <code>.env</code> files, secrets or data. Each stack has a <code>*.env.example</code> without values.</p>`;
     }
   }
   body.innerHTML=h;body.scrollTop=body.scrollTop;

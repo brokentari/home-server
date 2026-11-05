@@ -1,8 +1,5 @@
-# ownCloud Infinite Scale, one container with no external database.
-#   ./config         /etc/ocis                  NVMe: ocis.yaml, keys, secrets
-#   ./data           /var/lib/ocis              NVMe: users, search index, metadata
-#   ${OCIS_STORAGE}  /var/lib/ocis/storage/users  pool: the files, stored by UUID (not browsable)
-# Login redirects to OCIS_URL, so it only works through Caddy, not on the LAN IP and port.
+# Config and metadata on the NVMe, files on the pool (stored by UUID). Login only works
+# through Caddy.
 
 services:
   ocis:

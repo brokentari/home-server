@@ -1,5 +1,4 @@
-# Mounted at /etc/vikunja/config.yml. Only for settings that need real YAML types (Vikunja
-# ignores "true" from env vars for emailfallback); the rest is in docker-compose.yml.
+# Settings that need real YAML types (Vikunja ignores "true" from env vars for emailfallback)
 
 auth:
   openid:

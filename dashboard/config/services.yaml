@@ -1,8 +1,5 @@
 # https://gethomepage.dev/configs/services/
-# href: the link. url: where the widget fetches data (by container name).
-# server/container: status dot from the Docker socket (docker.yaml).
-# More tiles come from homepage.* labels on containers in other compose projects; weight sets
-# the order within a group.
+# More tiles come from homepage.* labels on containers; weight sets the order in a group.
 
 - Media:
     - Jellyfin:

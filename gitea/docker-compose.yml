@@ -1,6 +1,4 @@
-# Gitea, MySQL and an Actions runner. Git over SSH is on port 2222; in ~/.ssh/config:
-#   Host git.<domain>
-#     Port 2222
+# Git over SSH is port 2222 (Host git.<domain> / Port 2222 in ~/.ssh/config)
 
 services:
   gitea:
@@ -60,8 +58,7 @@ services:
       start_period: 60s
     restart: unless-stopped
 
-  # Actions jobs run in throwaway containers on the host's Docker. Registration is in
-  # runner/data/.runner.
+  # Runs Actions jobs in throwaway containers on the host's Docker
   gitea-runner:
     image: docker.io/gitea/act_runner:0.6.1
     container_name: gitea-runner

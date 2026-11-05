@@ -25,8 +25,7 @@ services:
       - admin_network
     restart: unless-stopped
 
-# Both created once by hand. arr_network has a fixed subnet because a firewall rule in media/
-# refers to it.
+# Create once (arr_network's subnet is fixed for a firewall rule in media/):
 #   docker network create --subnet 172.19.0.0/16 arr_network
 #   docker network create admin_network
 networks:

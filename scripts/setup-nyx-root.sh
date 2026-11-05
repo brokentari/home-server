@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 # One-time root setup on nyx, safe to re-run:  sudo bash ~/home-server/scripts/setup-nyx-root.sh
-#   1. unattended-upgrades (security updates)
-#   2. Tailscale auto-update
-#   3. Docker log limits (10 MB x 3 per container); restarts Docker if they change
-#   4. smartd alerts to ntfy (topic "disks"), temperature limits, NVMe monitoring
-#   5. SnapRAID nightly job (3:30): installs snapraid-nightly.sh and its systemd timer
 set -euo pipefail
 [ "$(id -u)" = 0 ] || { echo "run with sudo"; exit 1; }
 
@@ -30,8 +25,7 @@ else
 fi
 
 echo "== 4. smartd alerts"
-# Runs as root, so it reads the two values out of notify.env (owned by saul) instead of
-# sourcing it, same as snapraid-nightly.sh.
+# Runs as root, so it reads values from saul's notify.env instead of sourcing it
 cat > /usr/local/bin/smartd-ntfy <<'EOF'
 #!/bin/sh
 # smartd "-M exec" hook: disk warnings to ntfy topic "disks". Installed by setup-nyx-root.sh.

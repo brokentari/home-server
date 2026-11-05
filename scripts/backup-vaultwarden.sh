@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# Nightly pull of a consistent Vaultwarden snapshot from the Pi onto the pool (cron, 3:15).
-# Pings Uptime Kuma on success, ntfy "backups" on failure. backup-offsite.sh picks the archives up.
-#
-# Archive: db_<timestamp>.sqlite3 (Vaultwarden's online backup), config.json, rsa_key.pem,
-# attachments/, sends/. Restore: stop vaultwarden, extract into its data folder, rename
+# Nightly Vaultwarden snapshot from the Pi onto the pool (cron, 3:15). Pings Kuma on success,
+# ntfy on failure. Restore: stop vaultwarden, extract into its data folder, rename
 # db_*.sqlite3 to db.sqlite3.
 set -euo pipefail
 
@@ -37,8 +34,7 @@ out="$DEST/vaultwarden-$stamp.tar.gz"
 part="$out.part"
 trap 'rm -f "$part" "$ERRF"' EXIT
 
-# `vaultwarden backup` is safe while running. Tar the data folder without the live DB or icon
-# cache, then delete the snapshot so they don't pile up on the Pi.
+# Online backup, tar the data without the live DB, then delete the snapshot on the Pi
 STEP="Snapshot on the Pi"
 ssh -o BatchMode=yes -o ConnectTimeout=15 "$PI" 'docker exec vaultwarden sh -euc "
   rm -f /data/db_*.sqlite3

@@ -1,6 +1,5 @@
-// Cards with a long queue (progress-bar rows): show the first few and put the rest behind a
-// "More..." button. Homepage redraws the cards every few seconds, so this re-applies itself
-// whenever the page changes.
+// Collapses long queues on service cards behind a "More..." button. Re-applies whenever
+// Homepage redraws.
 (() => {
   const SHOW = 4;                        // queue items shown before "More..."
   const expanded = new Set();            // cards the viewer opened (until the page reloads)

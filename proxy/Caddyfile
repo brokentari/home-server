@@ -5,8 +5,7 @@
 	}
 }
 
-# For apps with no login of their own: Authelia (auth/) signs the user in first and passes
-# their name and groups on as headers.
+# Sign-in for apps without a login; passes the user's name and groups on as headers
 (authelia) {
 	forward_auth authelia:9091 {
 		uri /api/authz/forward-auth
@@ -14,8 +13,7 @@
 	}
 }
 
-# One wildcard certificate for every app. A new app only needs a DNS record and a handle block.
-# https://caddyserver.com/docs/caddyfile/patterns#wildcard-certificates
+# One wildcard certificate for every app
 *.{$BASE_DOMAIN} {
 	import cloudflare_tls
 
@@ -36,9 +34,7 @@
 		reverse_proxy ocis:9200
 	}
 
-	# Homepage has no login. Home network and Tailscale (100.64.0.0/10) go straight in,
-	# everyone else signs in with Authelia. Tailscale clients keep their 100.x address when
-	# nyx is the active subnet router; through the Pi they arrive from a LAN address.
+	# No login: the home network and Tailscale (100.64.0.0/10) skip Authelia
 	@homepage host {$HOMEPAGE_DOMAIN}
 	handle @homepage {
 		@outside not remote_ip private_ranges 100.64.0.0/10

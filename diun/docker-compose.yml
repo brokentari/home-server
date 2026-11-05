@@ -1,7 +1,4 @@
-# Saturday 9:00 check for new images, posted to ntfy "updates". Never updates anything.
-#   moving tags (latest, v3, 8): when the tag gets a new image
-#   pinned versions: newer version tags, via diun.* labels on those services
-#   caddy:2, the base of the locally built proxy image: images.yml
+# Checks for new images Saturdays at 9:00 and posts to ntfy. Pinned images use diun.* labels.
 
 services:
   diun:

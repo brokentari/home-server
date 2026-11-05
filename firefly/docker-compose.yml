@@ -1,8 +1,5 @@
-# Firefly III and its data importer. Settings (not named .env, so Compose doesn't use them
-# for substitution):
-#   firefly.env     includes APP_KEY, which encrypts the data: never change or lose it
-#   firefly-db.env  MariaDB user/database
-#   importer.env    data importer
+# APP_KEY in firefly.env encrypts the data: never change or lose it. The env files aren't
+# named .env, so Compose doesn't use them for substitution.
 
 services:
   firefly:

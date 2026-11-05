@@ -1,7 +1,6 @@
-# Based on the official v3 compose file; diff against the new one on major upgrades:
+# Based on the official v3 compose file (diff against it on major upgrades):
 #   https://github.com/immich-app/immich/releases/latest/download/docker-compose.yml
-# UPLOAD_LOCATION (photos, thumbnails, DB dumps) is on the pool. DB_DATA_LOCATION stays on the
-# NVMe: Postgres isn't supported on FUSE filesystems like mergerfs.
+# Postgres stays on the NVMe; Immich doesn't support it on mergerfs.
 
 name: immich
 
@@ -32,8 +31,7 @@ services:
 
   immich-machine-learning:
     container_name: immich_machine_learning
-    # CPU. For the iGPU: -openvino tag + hwaccel.ml.yml
-    # (https://docs.immich.app/features/ml-hardware-acceleration)
+    # CPU; the -openvino tag and hwaccel.ml.yml would use the iGPU
     image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
     volumes:
       - model-cache:/cache

@@ -1,14 +1,7 @@
 #!/usr/bin/env bash
-# Nightly SnapRAID job, run as root by snapraid-nightly.timer at 3:30. Installed as
-# /usr/local/bin/snapraid-nightly; after editing:
+# Nightly SnapRAID job (root, snapraid-nightly.timer, 3:30). After editing:
 #   sudo install -m 755 ~/home-server/scripts/snapraid-nightly.sh /usr/local/bin/snapraid-nightly
-#
-#   1. Refuse to sync if more than THRESHOLD files were deleted, so an accidental wipe doesn't
-#      overwrite the parity that could restore them
-#   2. Sync
-#   3. Sundays: scrub 8% (blocks not checked in 10 days)
-#   4. Alert on any bad blocks in snapraid status
-# Pings Uptime Kuma on success, ntfy "disks" on failure. Log: /var/log/snapraid-nightly.log
+# Won't sync after more than THRESHOLD deletions. Scrubs 8% on Sundays.
 set -uo pipefail
 
 THRESHOLD=50

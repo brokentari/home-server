@@ -1,6 +1,4 @@
-# Allowlist: only configs are tracked. Secrets (.env files, tokens, passwords, key files)
-# and all app data stay out. The offsite backup (scripts/backup-offsite.sh) covers those.
-# To track a new file, add a "!path" line below.
+# Allowlist: only configs are tracked. Add a "!path" line to track a new file.
 *
 !*/
 !.gitignore

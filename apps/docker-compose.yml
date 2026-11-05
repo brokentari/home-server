@@ -33,8 +33,7 @@ services:
   kavita:
     image: lscr.io/linuxserver/kavita:v0.9.0.2-ls111
     container_name: kavita
-    # Diun's semver sort can't handle 4-part versions (0.9.1.4), so use the newest-pushed
-    # version-* tags and ignore the weekly rebuilds of the same version.
+    # Diun can't semver-sort 4-part versions, so take the newest version-* tags
     labels:
       - diun.watch_repo=true
       - diun.include_tags=^version-v\d+(\.\d+)+$$

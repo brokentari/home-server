@@ -1,23 +1,11 @@
 #!/usr/bin/env bash
-# Update nyx: Debian packages first (rebooting if an update needs it), then every Docker stack in
-# ~/home-server (pull new images, rebuild Caddy, recreate what changed, delete the old images).
+# Updates nyx's Debian packages (rebooting if needed), then every Docker stack. Run it from
+# another computer: the work runs on nyx in the background and survives a dropped connection.
 #
-# Run it from another computer, not from an SSH session on nyx: it reboots nyx and carries on
-# once nyx is back. The work itself runs on nyx in the background, so a dropped connection
-# (laptop asleep, Wi-Fi, Tailscale restarting during its upgrade) doesn't interrupt it; this
-# script reconnects and keeps showing the output. Ctrl-C only stops the watching.
+#   scripts/update.sh [--os-only | --containers-only] [--no-reboot] [host]
+#   bash <(ssh nyx cat home-server/scripts/update.sh)     # without a clone
 #
-#   scripts/update.sh [options] [host]      host: how you ssh to nyx (default: nyx)
-#     --os-only           Debian packages (and the reboot) only
-#     --containers-only   Docker stacks only
-#     --no-reboot         don't reboot, even if an update needs it
-#
-# Without a copy of this repo on the other computer:
-#   bash <(ssh nyx cat home-server/scripts/update.sh)
-#
-# Needs bash (macOS's 3.2 is fine) and key-based ssh to nyx. Asks for your sudo password on nyx
-# once, for apt. Uses the compose files as they are on nyx, uncommitted edits included.
-# Logs on nyx: /var/log/home-update-os.log and ~/.local/state/home-update/containers.log
+# Logs on nyx: /var/log/home-update-os.log, ~/.local/state/home-update/containers.log
 
 set -eo pipefail # no `set -u`: bash 3.2 treats empty arrays as unset
 
@@ -55,12 +43,10 @@ if [ "$DO_OS" = no ] && [ "$DO_CONTAINERS" = no ]; then
 	exit 2
 fi
 
-# The functions below run on nyx. They're sent over ssh with `declare -f`, so the copy of this
-# file on nyx doesn't have to match.
+# Runs on nyx, sent over ssh with `declare -f`
 
-# Package update. Runs as root in a transient systemd unit, so it doesn't depend on the ssh
-# connection. `--with-new-pkgs upgrade` installs new dependencies (like a new kernel) but never
-# removes a package; anything that would need a removal is "kept back" for a manual look.
+# Root, in a transient systemd unit so it doesn't depend on ssh. --with-new-pkgs never removes
+# a package; anything that would is kept back.
 os_job() {
 	set -e
 	export DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none

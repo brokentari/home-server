@@ -1,3 +1,2 @@
-# Images Diun can't see through Docker. Caddy is built FROM caddy:2 (proxy/Dockerfile);
-# when it updates: cd ~/home-server/proxy && docker compose build --pull && docker compose up -d
+# Caddy is built FROM caddy:2. When it updates: cd ~/home-server/proxy && docker compose build --pull && docker compose up -d
 - name: caddy:2

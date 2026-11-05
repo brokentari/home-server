@@ -1,10 +1,6 @@
-# Authelia: sign-in (password + passkey/TOTP) for the apps without a login of their own, and
-# OpenID Connect for the ones with accounts. See README "Single sign-on".
-#   configuration.yml        settings
-#   data/users_database.yml  users and password hashes (template: users_database.example.yml)
+#   data/users_database.yml  users (template: users_database.example.yml)
 #   data/db.sqlite3          2FA devices, encrypted with secrets/storage-encryption-key
 #   secrets/                 one secret per file
-#   redis/                   sessions, so restarts don't sign anyone out
 
 services:
   authelia:
@@ -38,8 +34,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # Session store. Authelia encrypts sessions (secrets/session-secret) before storing them;
-  # saved to disk every minute so a Redis restart keeps them.
+  # Sessions, encrypted by Authelia and saved to disk every minute
   authelia-redis:
     image: redis:7.4-alpine
     container_name: authelia-redis

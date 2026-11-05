@@ -1,18 +1,7 @@
 #!/usr/bin/env bash
-# Nightly restic backup of the small, irreplaceable data to Cloudflare R2 (cron, 4:30, after
-# the SnapRAID sync). Pings Uptime Kuma on success, ntfy "backups" on failure.
-#
-#   /home/saul/home-server        compose files, configs, .env secrets, small app data
-#   /mnt/storage/backups          Vaultwarden archives and the dumps below
-#   /mnt/storage/photos/backups   Immich's database dumps (not the photos)
-# Refreshed in /mnt/storage/backups/dumps first:
-#   gitea.sql.gz, firefly.sql.gz  database dumps (live DB folders are excluded)
-#   gitea-ssh.tar.gz              Gitea's SSH host keys (root-only in its container)
-#   sqlite/                       consistent copies of every SQLite DB under home-server
-#   ocis/                         oCIS config, metadata and files (oCIS stopped for a few seconds)
-#   pi/                           the Pi's compose file, Caddyfile, .env, Kuma and ntfy databases
-# Skipped: media, photos/videos, images, caches, logs, files over 100 MB (restic-excludes.txt,
-# plus any <stack>/restic-excludes.txt).
+# Nightly restic backup to Cloudflare R2 (cron, 4:30). Pings Kuma on success, ntfy on failure.
+# Backs up ~/home-server, /mnt/storage/backups and Immich's DB dumps after refreshing
+# /mnt/storage/backups/dumps. Excludes: restic-excludes.txt plus any <stack>/restic-excludes.txt.
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
