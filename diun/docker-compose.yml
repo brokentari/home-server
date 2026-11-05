@@ -1,0 +1,36 @@
+# Saturday 9:00 check for new images, posted to ntfy "updates". Never updates anything.
+#   moving tags (latest, v3, 8): when the tag gets a new image
+#   pinned versions: newer version tags, via diun.* labels on those services
+#   caddy:2, the base of the locally built proxy image: images.yml
+
+services:
+  diun:
+    image: crazymax/diun:4.33.0
+    container_name: diun
+    command: serve
+    environment:
+      - TZ=America/New_York
+      - LOG_LEVEL=info
+      - DIUN_WATCH_WORKERS=10
+      - DIUN_WATCH_SCHEDULE=0 9 * * 6
+      - DIUN_WATCH_JITTER=30s
+      - DIUN_WATCH_FIRSTCHECKNOTIF=false
+      - DIUN_PROVIDERS_DOCKER=true
+      - DIUN_PROVIDERS_DOCKER_WATCHBYDEFAULT=true
+      - DIUN_PROVIDERS_FILE_FILENAME=/etc/diun/images.yml
+      - DIUN_NOTIF_NTFY_ENDPOINT=https://ntfy.saulreyna.com
+      - DIUN_NOTIF_NTFY_TOPIC=updates
+      - DIUN_NOTIF_NTFY_TOKENFILE=/etc/diun/ntfy-token   # write-only publisher token
+      - DIUN_NOTIF_NTFY_PRIORITY=3
+      - DIUN_NOTIF_NTFY_TAGS=package
+    volumes:
+      - ./data:/data
+      - ./images.yml:/etc/diun/images.yml:ro
+      - ./ntfy-token:/etc/diun/ntfy-token:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - diun.watch_repo=true
+      - diun.include_tags=^\d+\.\d+\.\d+$$
+      - diun.sort_tags=semver
+      - diun.max_tags=5
+    restart: unless-stopped

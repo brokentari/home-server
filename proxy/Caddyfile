@@ -1,0 +1,109 @@
+# Let's Encrypt over the Cloudflare DNS-01 challenge, so port 80 isn't needed for validation.
+(cloudflare_tls) {
+	tls {
+		dns cloudflare {env.CF_API_TOKEN}
+	}
+}
+
+# For apps with no login of their own: Authelia (auth/) signs the user in first and passes
+# their name and groups on as headers.
+(authelia) {
+	forward_auth authelia:9091 {
+		uri /api/authz/forward-auth
+		copy_headers Remote-User Remote-Groups Remote-Email Remote-Name
+	}
+}
+
+# One wildcard certificate for every app. A new app only needs a DNS record and a handle block.
+# https://caddyserver.com/docs/caddyfile/patterns#wildcard-certificates
+*.{$BASE_DOMAIN} {
+	import cloudflare_tls
+
+	@jellyfin host {$DOMAIN}
+	handle @jellyfin {
+		reverse_proxy jellyfin:8096
+		encode zstd gzip
+	}
+
+	@immich host {$IMMICH_DOMAIN}
+	handle @immich {
+		reverse_proxy immich_server:2283
+	}
+
+	# ownCloud Infinite Scale
+	@ocis host {$OCIS_DOMAIN}
+	handle @ocis {
+		reverse_proxy ocis:9200
+	}
+
+	# Homepage has no login. Home network and Tailscale (100.64.0.0/10) go straight in,
+	# everyone else signs in with Authelia. Tailscale clients keep their 100.x address when
+	# nyx is the active subnet router; through the Pi they arrive from a LAN address.
+	@homepage host {$HOMEPAGE_DOMAIN}
+	handle @homepage {
+		@outside not remote_ip private_ranges 100.64.0.0/10
+		route @outside {
+			import authelia
+		}
+		reverse_proxy homepage:3000
+	}
+
+	# Git over SSH is port 2222, not through Caddy
+	@gitea host git.{$BASE_DOMAIN}
+	handle @gitea {
+		reverse_proxy gitea:3000
+	}
+
+	@firefly host firefly.{$BASE_DOMAIN}
+	handle @firefly {
+		reverse_proxy firefly:8080
+	}
+	@importer host importer.{$BASE_DOMAIN}
+	handle @importer {
+		reverse_proxy firefly-importer:8080
+	}
+
+	@vikunja host todo.{$BASE_DOMAIN}
+	handle @vikunja {
+		reverse_proxy vikunja:3456
+	}
+
+	@kavita host kavita.{$BASE_DOMAIN}
+	handle @kavita {
+		reverse_proxy kavita:5000
+	}
+
+	@speedtest host speed.{$BASE_DOMAIN}
+	handle @speedtest {
+		reverse_proxy speedtest-tracker:80
+	}
+
+	@authelia host auth.{$BASE_DOMAIN}
+	handle @authelia {
+		reverse_proxy authelia:9091
+	}
+
+	# Admin tools (admin/, on admin_network): Authelia with 2FA
+	@dozzle host logs.{$BASE_DOMAIN}
+	handle @dozzle {
+		import authelia
+		reverse_proxy dozzle:8080
+	}
+	@scrutiny host disks.{$BASE_DOMAIN}
+	handle @scrutiny {
+		import authelia
+		reverse_proxy scrutiny:8080
+	}
+	@backrest host backups.{$BASE_DOMAIN}
+	handle @backrest {
+		import authelia
+		reverse_proxy backrest:9898
+	}
+
+	# Site blocks kept in a separate private config, if present (mounted at /etc/caddy/media/)
+	import media/*.caddy
+
+	handle {
+		abort
+	}
+}

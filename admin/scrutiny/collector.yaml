@@ -1,0 +1,16 @@
+# Devices are mapped in docker-compose.yml. The pool drives are in a USB enclosure that needs
+# smartctl's "-d sat" (as in /etc/smartd.conf).
+version: 1
+host:
+  id: nyx
+devices:
+  - device: /dev/sda
+    type: sat
+  - device: /dev/sdb
+    type: sat
+  - device: /dev/sdc
+    type: sat
+  - device: /dev/sdd
+    type: sat
+  - device: /dev/nvme0
+    type: nvme

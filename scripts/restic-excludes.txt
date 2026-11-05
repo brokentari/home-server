@@ -1,0 +1,59 @@
+# Paths and patterns backup-offsite.sh skips
+
+# Live databases: dumped to /mnt/storage/backups/dumps/ instead
+/home/saul/home-server/gitea/db
+/home/saul/home-server/firefly/db
+/home/saul/home-server/immich/postgres
+
+# Live SQLite files: copied to dumps/sqlite/ instead
+/home/saul/home-server/**/*.db
+/home/saul/home-server/**/*.db-wal
+/home/saul/home-server/**/*.db-shm
+/home/saul/home-server/**/*.sqlite
+/home/saul/home-server/**/*.sqlite-wal
+/home/saul/home-server/**/*.sqlite-shm
+/home/saul/home-server/**/*.sqlite3
+
+# oCIS: copied to dumps/ocis/ while stopped
+/home/saul/home-server/cloud/data
+/home/saul/home-server/cloud/config
+
+# Caches, logs, artwork, TLS certs
+/home/saul/home-server/apps/kavita/config/cache
+/home/saul/home-server/apps/kavita/config/covers
+/home/saul/home-server/apps/kavita/config/logs
+/home/saul/home-server/apps/kavita/config/temp
+/home/saul/home-server/apps/speedtest/config/log
+/home/saul/home-server/dashboard/config/logs
+/home/saul/home-server/diun/data
+/home/saul/home-server/proxy/data
+/home/saul/home-server/proxy/config
+/home/saul/home-server/admin/scrutiny/influxdb
+/home/saul/home-server/admin/backrest/cache
+/home/saul/home-server/admin/backrest/tmp
+/home/saul/home-server/auth/redis
+/home/saul/home-server/**/cleanup-backup-*
+/home/saul/home-server/**/.nv
+
+# Gitea's SSH host keys (root-only): copied to dumps/gitea-ssh.tar.gz instead
+/home/saul/home-server/gitea/data/ssh
+/home/saul/home-server/gitea/data/git/.ssh
+*.log
+*.log.*
+
+# Media, disk images, photos
+*.mkv
+*.mp4
+*.m4v
+*.avi
+*.mov
+*.webm
+*.iso
+*.jpg
+*.jpeg
+*.png
+*.heic
+*.gif
+*.webp
+*.dng
+*.raw

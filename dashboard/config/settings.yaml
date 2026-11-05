@@ -1,0 +1,28 @@
+# https://gethomepage.dev/configs/settings/
+title: nyx
+theme: dark
+color: slate
+headerStyle: clean
+statusStyle: dot
+hideVersion: true
+useEqualHeights: true
+
+layout:
+  Media:
+    style: row
+    columns: 5
+  Downloads:
+    style: row
+    columns: 3
+  Photos & Files:
+    style: row
+    columns: 2
+  Apps:
+    style: row
+    columns: 5
+  System:
+    style: row
+    columns: 4
+  Admin:
+    style: row
+    columns: 4

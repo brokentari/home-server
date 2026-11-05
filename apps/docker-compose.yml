@@ -1,0 +1,81 @@
+#   Vikunja            todo.<domain>
+#   Kavita             kavita.<domain>   library: /mnt/storage/data/media/books
+#   Speedtest Tracker  speed.<domain>
+
+services:
+  vikunja:
+    image: vikunja/vikunja:2.1.0
+    container_name: vikunja
+    labels:
+      - diun.watch_repo=true
+      - diun.include_tags=^\d+\.\d+\.\d+$$
+      - diun.sort_tags=semver
+      - diun.max_tags=5
+    environment:
+      VIKUNJA_SERVICE_PUBLICURL: https://todo.saulreyna.com/
+      VIKUNJA_SERVICE_JWTSECRET: ${VIKUNJA_JWT_SECRET}
+      VIKUNJA_DATABASE_PATH: /db/vikunja.db
+      # Mailjet
+      VIKUNJA_MAILER_ENABLED: "true"
+      VIKUNJA_MAILER_HOST: in-v3.mailjet.com
+      VIKUNJA_MAILER_PORT: "587"
+      VIKUNJA_MAILER_USERNAME: ${MAILJET_USERNAME}
+      VIKUNJA_MAILER_PASSWORD: ${VIKUNJA_MAILER_PASSWORD}
+      VIKUNJA_MAILER_FROMEMAIL: vikunja@saulreyna.com
+    volumes:
+      - ./vikunja/files:/app/vikunja/files
+      - ./vikunja/db:/db
+      # OpenID Connect with Authelia
+      - ./vikunja-config.yml:/etc/vikunja/config.yml:ro
+      - ../auth/secrets/oidc-vikunja-secret:/run/secrets/vikunja-oidc-secret:ro
+    restart: unless-stopped
+
+  kavita:
+    image: lscr.io/linuxserver/kavita:v0.9.0.2-ls111
+    container_name: kavita
+    # Diun's semver sort can't handle 4-part versions (0.9.1.4), so use the newest-pushed
+    # version-* tags and ignore the weekly rebuilds of the same version.
+    labels:
+      - diun.watch_repo=true
+      - diun.include_tags=^version-v\d+(\.\d+)+$$
+      - diun.sort_tags=reverse
+      - diun.max_tags=5
+      - diun.notify_on=new
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/New_York
+      - DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=true
+    volumes:
+      - ./kavita/config:/config
+      - /mnt/storage/data/media/books:/library
+    restart: unless-stopped
+
+  speedtest-tracker:
+    image: lscr.io/linuxserver/speedtest-tracker:1.14.3
+    container_name: speedtest-tracker
+    labels:
+      - diun.watch_repo=true
+      - diun.include_tags=^\d+\.\d+\.\d+$$
+      - diun.sort_tags=semver
+      - diun.max_tags=5
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - APP_NAME=saul home server
+      - APP_URL=https://speed.saulreyna.com
+      - APP_TIMEZONE=America/New_York
+      - DISPLAY_TIMEZONE=America/New_York
+      - CHART_DATETIME_FORMAT=m/j g:i a
+      - DATETIME_FORMAT=M j Y g:i:s a
+      - APP_KEY=${SPEEDTEST_APP_KEY}
+      - DB_CONNECTION=sqlite
+      - SPEEDTEST_SCHEDULE=6 */2 * * *            # every 2 hours at :06
+    volumes:
+      - ./speedtest/config:/config
+    restart: unless-stopped
+
+networks:
+  default:
+    name: arr_network
+    external: true

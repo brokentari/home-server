@@ -1,0 +1,42 @@
+# ownCloud Infinite Scale, one container with no external database.
+#   ./config         /etc/ocis                  NVMe: ocis.yaml, keys, secrets
+#   ./data           /var/lib/ocis              NVMe: users, search index, metadata
+#   ${OCIS_STORAGE}  /var/lib/ocis/storage/users  pool: the files, stored by UUID (not browsable)
+# Login redirects to OCIS_URL, so it only works through Caddy, not on the LAN IP and port.
+
+services:
+  ocis:
+    image: owncloud/ocis:8
+    container_name: ocis
+    # `ocis init` writes /etc/ocis/ocis.yaml on the first start and fails harmlessly after
+    entrypoint: ["/bin/sh"]
+    command: ["-c", "ocis init || true; exec ocis server"]
+    environment:
+      OCIS_URL: https://${OCIS_DOMAIN}
+      OCIS_LOG_LEVEL: info
+      # TLS ends at Caddy
+      PROXY_TLS: "false"
+      PROXY_HTTP_ADDR: 0.0.0.0:9200
+      OCIS_INSECURE: "false"
+      IDM_CREATE_DEMO_USERS: "false"
+      # first start only
+      IDM_ADMIN_PASSWORD: ${OCIS_ADMIN_PASSWORD}
+      # Mailjet
+      NOTIFICATIONS_SMTP_HOST: in-v3.mailjet.com
+      NOTIFICATIONS_SMTP_PORT: "587"
+      NOTIFICATIONS_SMTP_ENCRYPTION: starttls
+      NOTIFICATIONS_SMTP_AUTHENTICATION: login
+      NOTIFICATIONS_SMTP_SENDER: "ownCloud <cloud@saulreyna.com>"
+      NOTIFICATIONS_SMTP_USERNAME: ${SMTP_USERNAME}
+      NOTIFICATIONS_SMTP_PASSWORD: ${SMTP_PASSWORD}
+    volumes:
+      - ./config:/etc/ocis
+      - ./data:/var/lib/ocis
+      - ${OCIS_STORAGE}:/var/lib/ocis/storage/users
+    networks:
+      - arr_network
+    restart: unless-stopped
+
+networks:
+  arr_network:
+    external: true

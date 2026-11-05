@@ -1,0 +1,17 @@
+# Mounted at /etc/vikunja/config.yml. Only for settings that need real YAML types (Vikunja
+# ignores "true" from env vars for emailfallback); the rest is in docker-compose.yml.
+
+auth:
+  openid:
+    enabled: true
+    providers:
+      # client "vikunja" in auth/configuration.yml
+      authelia:
+        name: Authelia
+        authurl: https://auth.saulreyna.com
+        clientid: vikunja
+        clientsecret:
+          file: /run/secrets/vikunja-oidc-secret   # auth/secrets/oidc-vikunja-secret
+        scope: openid profile email
+        # match the existing local account by email (its password login keeps working)
+        emailfallback: true

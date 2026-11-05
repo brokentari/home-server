@@ -1,0 +1,94 @@
+# Firefly III and its data importer. Settings (not named .env, so Compose doesn't use them
+# for substitution):
+#   firefly.env     includes APP_KEY, which encrypts the data: never change or lose it
+#   firefly-db.env  MariaDB user/database
+#   importer.env    data importer
+
+services:
+  firefly:
+    image: fireflyiii/core:version-6.2.10
+    container_name: firefly
+    labels:
+      - diun.watch_repo=true
+      - diun.include_tags=^version-\d+\.\d+\.\d+$$
+      - diun.sort_tags=semver
+      - diun.max_tags=5
+    env_file: firefly.env
+    environment:
+      # override the hostnames in firefly.env
+      - DB_HOST=firefly-db
+      - REDIS_HOST=firefly-redis
+    volumes:
+      - ./upload:/var/www/html/storage/upload
+    networks:
+      - default
+      - arr_network
+    depends_on:
+      firefly-db:
+        condition: service_healthy
+      firefly-redis:
+        condition: service_started
+    restart: unless-stopped
+
+  firefly-db:
+    image: mariadb:12.3.2
+    container_name: firefly-db
+    labels:
+      - diun.watch_repo=true
+      - diun.include_tags=^\d+\.\d+\.\d+$$
+      - diun.sort_tags=semver
+      - diun.max_tags=5
+    env_file: firefly-db.env
+    volumes:
+      - ./db:/var/lib/mysql                     # NVMe, not the pool
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  firefly-redis:
+    image: redis:7.4-alpine
+    container_name: firefly-redis
+    restart: unless-stopped
+
+  firefly-importer:
+    image: fireflyiii/data-importer:version-2.3.2
+    container_name: firefly-importer
+    labels:
+      - diun.watch_repo=true
+      - diun.include_tags=^version-\d+\.\d+\.\d+$$
+      - diun.sort_tags=semver
+      - diun.max_tags=5
+    env_file: importer.env                      # FIREFLY_III_URL=http://firefly:8080
+    environment:
+      # trust Caddy's X-Forwarded-* so redirects use https://
+      - TRUSTED_PROXIES=**
+      - APP_URL=https://importer.saulreyna.com
+    networks:
+      - default
+      - arr_network
+    depends_on:
+      - firefly
+    restart: unless-stopped
+
+  # Firefly's daily jobs (recurring transactions, bills) at 3:00
+  firefly-cron:
+    image: alpine:3.22
+    container_name: firefly-cron
+    env_file: firefly.env                       # provides STATIC_CRON_TOKEN
+    command: >-
+      sh -c 'apk add --no-cache tzdata >/dev/null &&
+      ln -sf /usr/share/zoneinfo/America/New_York /etc/localtime &&
+      echo "0 3 * * * wget -qO- http://firefly:8080/api/v1/cron/$$STATIC_CRON_TOKEN; echo" | crontab - &&
+      crond -f -L /dev/stdout'
+    depends_on:
+      - firefly
+    restart: unless-stopped
+
+networks:
+  default: {}
+  arr_network:
+    external: true

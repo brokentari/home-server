@@ -1,0 +1,22 @@
+# https://gethomepage.dev/widgets/  (the row across the top of the page)
+- resources:
+    label: nyx
+    cpu: true
+    memory: true
+    cputemp: true
+    uptime: true
+
+- resources:
+    label: NVMe
+    disk: /
+
+- resources:
+    label: Storage pool
+    disk: /mnt/storage
+
+- datetime:
+    text_size: xl
+    format:
+      dateStyle: long
+      timeStyle: short
+      hourCycle: h12

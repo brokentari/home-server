@@ -1,0 +1,65 @@
+# Authelia: sign-in (password + passkey/TOTP) for the apps without a login of their own, and
+# OpenID Connect for the ones with accounts. See README "Single sign-on".
+#   configuration.yml        settings
+#   data/users_database.yml  users and password hashes (template: users_database.example.yml)
+#   data/db.sqlite3          2FA devices, encrypted with secrets/storage-encryption-key
+#   secrets/                 one secret per file
+#   redis/                   sessions, so restarts don't sign anyone out
+
+services:
+  authelia:
+    image: authelia/authelia:4.39.28
+    container_name: authelia
+    user: "1000:1000"
+    labels:
+      - diun.watch_repo=true
+      - diun.include_tags=^\d+\.\d+\.\d+$$
+      - diun.sort_tags=semver
+      - diun.max_tags=5
+    environment:
+      - TZ=America/New_York
+      - AUTHELIA_NOTIFIER_SMTP_USERNAME=${MAILJET_USERNAME}
+      - AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE=/secrets/jwt-secret
+      - AUTHELIA_SESSION_SECRET_FILE=/secrets/session-secret
+      - AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE=/secrets/storage-encryption-key
+      - AUTHELIA_NOTIFIER_SMTP_PASSWORD_FILE=/secrets/smtp-password
+      # lets configuration.yml read the OIDC key and client secret hashes from secrets/
+      - X_AUTHELIA_CONFIG_FILTERS=template
+      - AUTHELIA_IDENTITY_PROVIDERS_OIDC_HMAC_SECRET_FILE=/secrets/oidc-hmac-secret
+    volumes:
+      - ./configuration.yml:/config/configuration.yml:ro
+      - ./data:/data
+      - ./secrets:/secrets:ro
+    networks:
+      - default
+      - sessions
+    depends_on:
+      authelia-redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Session store. Authelia encrypts sessions (secrets/session-secret) before storing them;
+  # saved to disk every minute so a Redis restart keeps them.
+  authelia-redis:
+    image: redis:7.4-alpine
+    container_name: authelia-redis
+    user: "1000:1000"
+    command: redis-server --save 60 1 --appendonly no
+    volumes:
+      - ./redis:/data
+    networks:
+      - sessions
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+networks:
+  default:
+    name: arr_network
+    external: true
+  # Authelia and Redis only, no internet
+  sessions:
+    internal: true

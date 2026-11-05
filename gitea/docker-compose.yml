@@ -1,0 +1,88 @@
+# Gitea, MySQL and an Actions runner. Git over SSH is on port 2222; in ~/.ssh/config:
+#   Host git.<domain>
+#     Port 2222
+
+services:
+  gitea:
+    image: docker.gitea.com/gitea:1.26.2
+    container_name: gitea
+    labels:
+      - diun.watch_repo=true
+      - diun.include_tags=^\d+\.\d+\.\d+$$
+      - diun.sort_tags=semver
+      - diun.max_tags=5
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - TZ=America/New_York
+      - GITEA__database__DB_TYPE=mysql
+      - GITEA__database__HOST=gitea-db:3306
+      - GITEA__database__NAME=gitea
+      - GITEA__database__USER=gitea
+      - GITEA__database__PASSWD=${GITEA_DB_PASSWORD}
+      - GITEA__server__SSH_PORT=2222          # port shown in clone URLs
+      # No sign-ups, so the Authelia login source can only link to an existing account
+      - GITEA__service__DISABLE_REGISTRATION=true
+      - GITEA__openid__ENABLE_OPENID_SIGNUP=false
+    volumes:
+      - ./data:/data
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - 2222:22                               # git over SSH
+    networks:
+      - default
+      - arr_network
+    depends_on:
+      gitea-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  gitea-db:
+    image: mysql:8.4.9
+    container_name: gitea-db
+    labels:                                   # stay on 8.4 LTS
+      - diun.watch_repo=true
+      - diun.include_tags=^8\.4\.\d+$$
+      - diun.sort_tags=semver
+      - diun.max_tags=5
+    environment:
+      - MYSQL_ROOT_PASSWORD=${GITEA_DB_ROOT_PASSWORD}
+      - MYSQL_USER=gitea
+      - MYSQL_PASSWORD=${GITEA_DB_PASSWORD}
+      - MYSQL_DATABASE=gitea
+    volumes:
+      - ./db:/var/lib/mysql                   # NVMe, not the pool
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  # Actions jobs run in throwaway containers on the host's Docker. Registration is in
+  # runner/data/.runner.
+  gitea-runner:
+    image: docker.io/gitea/act_runner:0.6.1
+    container_name: gitea-runner
+    labels:
+      - diun.watch_repo=true
+      - diun.include_tags=^\d+\.\d+\.\d+$$
+      - diun.sort_tags=semver
+      - diun.max_tags=5
+    environment:
+      CONFIG_FILE: /config.yaml
+      GITEA_INSTANCE_URL: https://git.saulreyna.com
+      GITEA_RUNNER_NAME: gitea-runner
+    volumes:
+      - ./runner/config.yaml:/config.yaml
+      - ./runner/data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - gitea
+    restart: unless-stopped
+
+networks:
+  default: {}
+  arr_network:
+    external: true

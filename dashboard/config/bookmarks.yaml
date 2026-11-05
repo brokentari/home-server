@@ -1,0 +1,7 @@
+# https://gethomepage.dev/configs/bookmarks/
+# Empty so Homepage doesn't add its sample links. Example:
+# - Links:
+#     - GitHub:
+#         - abbr: GH
+#           href: https://github.com/
+[]

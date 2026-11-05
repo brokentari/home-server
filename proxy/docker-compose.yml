@@ -1,0 +1,36 @@
+services:
+  caddy:
+    build: .                       # Caddy + the Cloudflare DNS plugin (see Dockerfile)
+    container_name: caddy
+    labels:
+      - diun.enable=false          # built locally; Diun watches caddy:2 instead (diun/images.yml)
+    environment:
+      - BASE_DOMAIN=${BASE_DOMAIN}
+      - DOMAIN=${DOMAIN}
+      - IMMICH_DOMAIN=${IMMICH_DOMAIN}
+      - OCIS_DOMAIN=${OCIS_DOMAIN}
+      - HOMEPAGE_DOMAIN=${HOMEPAGE_DOMAIN}
+      - CF_API_TOKEN=${CF_API_TOKEN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../media/caddy:/etc/caddy/media:ro   # private site blocks, if present
+      - ./data:/data               # certificates
+      - ./config:/config
+    ports:
+      - 80:80                      # HTTP -> HTTPS redirect
+      - 443:443
+      - 443:443/udp                # HTTP/3
+    networks:
+      - arr_network
+      - admin_network
+    restart: unless-stopped
+
+# Both created once by hand. arr_network has a fixed subnet because a firewall rule in media/
+# refers to it.
+#   docker network create --subnet 172.19.0.0/16 arr_network
+#   docker network create admin_network
+networks:
+  arr_network:
+    external: true
+  admin_network:
+    external: true

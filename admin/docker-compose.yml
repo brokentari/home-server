@@ -1,0 +1,93 @@
+# Admin tools with no login of their own. Caddy serves them only after an Authelia sign-in
+# with 2FA, and they sit on admin_network (shared with Caddy and Homepage only) so other
+# containers can't reach them directly.
+#   Dozzle    logs.<domain>     container logs, read-only
+#   Scrutiny  disks.<domain>    SMART history for the pool drives and the NVMe
+#   Backrest  backups.<domain>  browse/restore the restic repo on R2
+
+services:
+  dozzle:
+    image: amir20/dozzle:v11.3.4
+    container_name: dozzle
+    labels:
+      - diun.watch_repo=true
+      - diun.include_tags=^v\d+\.\d+\.\d+$$
+      - diun.sort_tags=semver
+      - diun.max_tags=5
+    environment:
+      - DOZZLE_HOSTNAME=nyx
+      - DOZZLE_AUTH_PROVIDER=forward-proxy   # trusts Remote-User from Caddy/Authelia
+      - DOZZLE_NO_ANALYTICS=true
+      # dozzle-agent on the Pi; it only accepts clients holding the cert in dozzle/
+      - DOZZLE_REMOTE_AGENT=192.168.50.143:7007
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./dozzle/cert.pem:/dozzle_cert.pem:ro
+      - ./dozzle/key.pem:/dozzle_key.pem:ro
+    restart: unless-stopped
+
+  scrutiny:
+    image: ghcr.io/analogj/scrutiny:v0.9.5-omnibus
+    container_name: scrutiny
+    labels:
+      - diun.watch_repo=true
+      - diun.include_tags=^v\d+\.\d+\.\d+-omnibus$$
+      - diun.sort_tags=semver
+      - diun.max_tags=5
+    cap_add:
+      - SYS_RAWIO                          # smartctl
+      - SYS_ADMIN                          # smartctl on NVMe
+    environment:
+      - TZ=America/New_York
+      - COLLECTOR_CRON_SCHEDULE=30 5 * * * # after the nightly backups
+      - SCRUTINY_NOTIFY_URLS=${SCRUTINY_NOTIFY_URL}
+    # Drives by /dev/disk/by-id path (set in .env) so a reboot that reshuffles sdX can't swap
+    # them. collector.yaml sets the USB enclosure's device type.
+    devices:
+      - ${DISK_SDA}:/dev/sda
+      - ${DISK_SDB}:/dev/sdb
+      - ${DISK_SDC}:/dev/sdc
+      - ${DISK_SDD}:/dev/sdd
+      - /dev/nvme0:/dev/nvme0
+    volumes:
+      - /run/udev:/run/udev:ro
+      - ./scrutiny/config:/opt/scrutiny/config
+      - ./scrutiny/collector.yaml:/opt/scrutiny/config/collector.yaml:ro
+      - ./scrutiny/influxdb:/opt/scrutiny/influxdb        # not backed up offsite
+    restart: unless-stopped
+
+  backrest:
+    image: garethgeorge/backrest:v1.14.1
+    container_name: backrest
+    user: "1000:1000"
+    labels:
+      - diun.watch_repo=true
+      - diun.include_tags=^v\d+\.\d+\.\d+$$
+      - diun.sort_tags=semver
+      - diun.max_tags=5
+    # Same repo and keys as scripts/backup-offsite.sh, which does the backups, pruning and
+    # checks. Backrest is only for browsing and restoring.
+    env_file: ../scripts/restic.env
+    environment:
+      - TZ=America/New_York
+      - BACKREST_DATA=/data
+      - BACKREST_CONFIG=/config/config.json
+      - XDG_CACHE_HOME=/cache
+      - TMPDIR=/tmp
+    volumes:
+      - ./backrest/data:/data
+      - ./backrest/config:/config
+      - ./backrest/cache:/cache
+      - ./backrest/tmp:/tmp
+      # same path as on the host so RESTIC_PASSWORD_FILE in restic.env works as-is
+      - ../scripts/restic-password:/home/saul/home-server/scripts/restic-password:ro
+      - /mnt/storage/restore:/restore
+    restart: unless-stopped
+
+# Not arr_network: Backrest can read every secret in the backups, and Dozzle trusts the
+# Remote-User header, so only Caddy and Homepage share this network.
+# Create once: docker network create admin_network
+networks:
+  default:
+    name: admin_network
+    external: true

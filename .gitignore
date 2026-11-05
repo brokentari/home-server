@@ -1,0 +1,51 @@
+# Allowlist: only configs are tracked. Secrets (.env files, tokens, passwords, key files)
+# and all app data stay out. The offsite backup (scripts/backup-offsite.sh) covers those.
+# To track a new file, add a "!path" line below.
+*
+!*/
+!.gitignore
+!README.md
+!*/docker-compose.yml
+!*/.env.example
+!*/*.env.example
+!proxy/Caddyfile
+!proxy/Dockerfile
+!dashboard/config/*.yaml
+!dashboard/config/custom.css
+!dashboard/config/custom.js
+!diun/images.yml
+!gitea/runner/config.yaml
+!immich/hwaccel.transcoding.yml
+!auth/configuration.yml
+!auth/users_database.example.yml
+!admin/scrutiny/collector.yaml
+!apps/vikunja-config.yml
+!scripts/*.sh
+!scripts/restic-excludes.txt
+
+# media/ is a separate private repo
+media/
+
+# Data folders (some are root-owned): don't even look inside
+gitea/data/
+gitea/db/
+gitea/runner/data/
+firefly/db/
+firefly/upload/
+immich/postgres/
+cloud/data/
+cloud/config/
+proxy/data/
+proxy/config/
+apps/vikunja/
+apps/kavita/
+apps/speedtest/
+diun/data/
+dashboard/config/logs/
+auth/data/
+auth/secrets/
+auth/redis/
+admin/scrutiny/config/
+admin/scrutiny/influxdb/
+admin/backrest/
+admin/dozzle/
