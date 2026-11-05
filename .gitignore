@@ -22,6 +22,8 @@
 !scripts/restic-excludes.txt
 !docs/index.html
 !docs/.nojekyll
+!docs/favicon.ico
+!docs/apple-touch-icon.png
 
 # media/ is a separate private repo
 media/
