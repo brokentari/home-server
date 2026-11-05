@@ -1,0 +1,897 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="An interactive isometric map of brokentari/home-server: Caddy, Jellyfin, Immich, backups and the Pi.">
+<title>Nyx Home Server Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&display=swap">
+<style>
+/* Stats strip on top, component index left, isometric plan centre, reading panel right */
+:root{
+  --bg:#cdc398;
+  --bg-2:#c3b98c;
+  --paper:#e6dfbf;
+  --ink:#1c1a13;
+  --ink-2:#565038;
+  --rule:rgba(28,26,19,.62);
+  --grid:rgba(28,26,19,.085);
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#1e1c15;--bg-2:#29261c;--paper:#2f2b20;--ink:#d8cea3;--ink-2:#9a916f;
+  --rule:rgba(216,206,163,.55);--grid:rgba(216,206,163,.07);color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1e1c15;--bg-2:#29261c;--paper:#2f2b20;--ink:#d8cea3;--ink-2:#9a916f;
+  --rule:rgba(216,206,163,.55);--grid:rgba(216,206,163,.07);color-scheme:dark}
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:13px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));box-sizing:border-box}
+*,*::before,*::after{box-sizing:border-box}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.lab{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2)}
+
+.app{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr);border-left:1px solid var(--rule);border-right:1px solid var(--rule)}
+
+/* stats strip */
+.top{display:flex;align-items:stretch;border-bottom:1.5px solid var(--ink);min-width:0}
+.stats{display:flex;overflow-x:auto;min-width:0;scrollbar-width:none}
+.stats::-webkit-scrollbar{display:none}
+.stat{padding:6px 16px 7px 12px;border-right:1px solid var(--rule);white-space:nowrap;display:grid;gap:1px}
+.stat b{font-weight:400;font-size:15px;letter-spacing:.01em;font-variant-numeric:tabular-nums}
+.acts{display:flex;gap:6px;align-items:center;margin-left:auto;padding:6px 0 6px 12px;flex-shrink:0}
+.btn{background:transparent;border:1.5px solid var(--ink);padding:5px 10px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--ink);color:var(--bg)}
+.btn[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+
+.main{display:grid;grid-template-columns:212px minmax(0,1fr) 410px;min-height:0}
+
+/* component index */
+.side{border-right:1.5px solid var(--ink);overflow-y:auto;padding:10px 12px 18px 0;min-height:0}
+.grp{margin:14px 0 6px}
+.grp:first-child{margin-top:4px}
+.item{display:grid;grid-template-columns:30px 1fr auto;align-items:start;gap:4px;width:100%;text-align:left;
+  background:transparent;border:1.5px solid var(--ink);padding:5px 8px 5px 8px;margin:0 0 5px;cursor:pointer;font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;line-height:1.35}
+.item .c{color:var(--ink-2);font-size:10px;padding-top:1px}
+.item .n{color:var(--ink-2);font-size:10.5px;font-variant-numeric:tabular-nums}
+.item:hover{background:var(--bg-2)}
+.item.on{background:var(--ink);color:var(--bg)}
+.item.on .c,.item.on .n{color:var(--bg)}
+.item.sub{margin-left:14px;width:calc(100% - 14px);border-color:var(--rule)}
+.sublab{margin:2px 0 5px;font-size:10px;letter-spacing:.14em;color:var(--ink-2);text-transform:uppercase;padding-left:2px}
+
+/* stage */
+.stage{position:relative;overflow:hidden;min-height:0;touch-action:none;cursor:grab}
+.stage.drag{cursor:grabbing}
+.stage svg{display:block;width:100%;height:100%}
+.crumb{position:absolute;left:14px;top:12px;display:flex;gap:10px;align-items:center;pointer-events:auto}
+.crumb .path{font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+.zoom{position:absolute;right:14px;top:12px;display:grid;gap:6px}
+.zoom .btn{width:28px;height:26px;padding:0;font-size:14px;letter-spacing:0;background:var(--bg)}
+.legend{position:absolute;left:14px;right:14px;bottom:10px;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tip{position:absolute;max-width:280px;background:var(--ink);color:var(--bg);padding:7px 9px;font-size:11.5px;line-height:1.45;pointer-events:none;z-index:5}
+.tip b{display:block;font-weight:500;letter-spacing:.1em;text-transform:uppercase;font-size:10.5px;margin-bottom:2px}
+
+/* svg drawing */
+.grid{stroke:var(--grid);stroke-width:1;fill:none}
+.plate{fill:none;stroke:var(--rule);stroke-width:1}
+.plate.dash{stroke-dasharray:5 4}
+.plabel{fill:var(--ink-2);font-size:9.5px;letter-spacing:.18em;font-family:var(--mono)}
+.edge{fill:none;stroke:var(--ink);stroke-width:1.05}
+.edge.faint{stroke:var(--rule);stroke-dasharray:4 4}
+.edge.lit{stroke-width:2.2}
+.knot{fill:var(--ink)}
+.face{stroke:var(--ink);stroke-width:1;stroke-linejoin:round}
+.face.top{fill:url(#hTop)}
+.face.rt{fill:url(#hRight)}
+.face.lf{fill:url(#hLeft)}
+.open .face{fill:var(--paper)}
+.open .face.rt{fill:var(--bg-2)}
+.shell .face{fill:none;stroke-dasharray:4 3}
+.pbg{fill:var(--bg)}
+.pl{stroke:var(--ink);stroke-width:.6}
+.blk{cursor:pointer}
+.blk text{font-family:var(--mono);font-size:9px;fill:var(--ink);letter-spacing:.06em;pointer-events:none}
+.blk:hover .face{stroke-width:1.7}
+.blk.sel .face.top{fill:var(--ink)}
+.blk.sel text.code{fill:var(--bg)}
+.blk.sel .face{stroke-width:1.8}
+.blk.hit .face.top{fill:var(--ink);transition:fill .1s}
+.blk.hit text.code{fill:var(--bg)}
+.flabel{font-family:var(--mono);font-size:8.6px;letter-spacing:.12em;fill:var(--ink)}
+.flag{fill:var(--ink)}
+.flagt{fill:var(--bg);font-family:var(--mono);font-size:8px;font-weight:600}
+.dot{cursor:pointer}
+.dot .hit{fill:transparent}
+.dot .core{fill:var(--ink)}
+.dot .halo{fill:none;stroke:var(--ink);stroke-width:1;opacity:0}
+.dot.sel .halo{opacity:1}
+.dot.sel .core{r:4.2}
+
+/* reading panel */
+.panel{border-left:1.5px solid var(--ink);display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0}
+.tabs{display:grid;grid-template-columns:1fr 1fr;border-bottom:1.5px solid var(--ink)}
+.tab{background:transparent;border:0;padding:8px 6px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;cursor:pointer}
+.tab+.tab{border-left:1.5px solid var(--ink)}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+.body{overflow-y:auto;padding:16px 18px 28px;min-width:0}
+.body h1{font-size:23px;font-weight:400;letter-spacing:.02em;margin:4px 0 2px;line-height:1.2;text-wrap:balance}
+.body .sub{color:var(--ink-2);font-size:12px;margin:0 0 18px}
+.body h2{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-2);font-weight:400;margin:22px 0 10px;padding-bottom:5px;border-bottom:1.5px solid var(--ink)}
+.body p{margin:0 0 12px;font-size:13.5px;line-height:1.72;max-width:62ch}
+mark,.mk{background:var(--ink);color:var(--bg);padding:0 3px}
+.body code{font-family:var(--mono);background:var(--bg-2);padding:0 3px}
+pre.snip{background:var(--ink);color:var(--bg);padding:11px 12px;font-size:11.5px;line-height:1.6;overflow-x:auto;margin:0 0 12px;white-space:pre}
+.kv{display:grid;grid-template-columns:96px minmax(0,1fr);gap:4px 12px;font-size:12px;margin:0 0 12px}
+.kv dt{color:var(--ink-2);letter-spacing:.1em;text-transform:uppercase;font-size:10.5px;padding-top:2px}
+.kv dd{margin:0;word-break:break-word}
+.cond{border:1.5px solid var(--ink);padding:8px 10px;margin:0 0 8px;font-size:12.5px;line-height:1.55}
+.cond b{font-weight:500;display:block}
+.cond span{color:var(--ink-2)}
+.steps{list-style:none;padding:0;margin:0 0 12px;display:grid;gap:5px}
+.steps button{display:grid;grid-template-columns:26px minmax(0,1fr);gap:6px;width:100%;text-align:left;background:transparent;border:1px solid var(--rule);padding:6px 8px;cursor:pointer;font-size:12px;line-height:1.45}
+.steps button:hover{background:var(--bg-2)}
+.steps button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.steps .k{color:inherit;opacity:.7;font-variant-numeric:tabular-nums}
+.inline{background:var(--ink);color:var(--bg);border:0;padding:1px 5px;cursor:pointer;font-size:12.5px}
+.links{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 12px}
+.links button{background:transparent;border:1px solid var(--ink);padding:2px 7px;font-size:11px;letter-spacing:.08em;cursor:pointer;text-transform:uppercase}
+.links button:hover{background:var(--ink);color:var(--bg)}
+table.folders{width:100%;border-collapse:collapse;font-size:11.5px;margin:0 0 12px}
+table.folders td{border-top:1px solid var(--rule);padding:5px 6px 5px 0;vertical-align:top}
+table.folders td:first-child{white-space:nowrap;padding-right:10px}
+table.folders td.n{text-align:right;font-variant-numeric:tabular-nums;padding-right:0}
+
+/* phone */
+@media (max-width:900px){
+  html,body{height:auto}
+  .app{height:auto;border:0}
+  .top{flex-wrap:wrap}
+  .stats{width:100%;border-bottom:1px solid var(--rule)}
+  .stat:first-child{padding-left:0}
+  .acts{margin-left:0;padding:8px 0;width:100%;flex-wrap:wrap}
+  .acts .btn{flex:1 1 auto;padding:7px 8px}
+  .main{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto}
+  .side{border-right:0;border-bottom:1.5px solid var(--ink);display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;padding:8px 0;scrollbar-width:thin}
+  .side .grp,.side .sublab{display:none}
+  .item,.item.sub{flex:0 0 auto;width:auto;margin:0;grid-template-columns:auto auto;white-space:nowrap}
+  .item .n{display:none}
+  .stage{height:62vh;min-height:360px;border-bottom:1.5px solid var(--ink)}
+  .legend{display:none}
+  .panel{border-left:0}
+  .body{padding:14px 0 28px;overflow:visible}
+}
+@media (prefers-reduced-motion:reduce){.blk.hit .face.top{transition:none}}
+</style>
+<style>html{color-scheme:light}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+
+<div class="app">
+  <header class="top">
+    <div class="stats" id="stats"></div>
+    <div class="acts">
+      <button class="btn" id="play" aria-pressed="false">▶ Resume the flow</button>
+      <button class="btn" id="step">Trace one step</button>
+      <button class="btn" id="reset">Reset view</button>
+    </div>
+  </header>
+  <div class="main">
+    <nav class="side" id="side" aria-label="Components"></nav>
+    <section class="stage" id="stage" aria-label="Isometric map of the stack">
+      <svg id="svg" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="hTop" width="3.4" height="3.4" patternUnits="userSpaceOnUse" patternTransform="rotate(-30)"><rect class="pbg" width="3.4" height="3.4"/><line class="pl" x1="0" y1="0" x2="0" y2="3.4"/></pattern>
+          <pattern id="hRight" width="2.6" height="2.6" patternUnits="userSpaceOnUse" patternTransform="rotate(30)"><rect class="pbg" width="2.6" height="2.6"/><line class="pl" x1="0" y1="0" x2="0" y2="2.6"/></pattern>
+          <pattern id="hLeft" width="2.4" height="2.4" patternUnits="userSpaceOnUse"><rect class="pbg" width="2.4" height="2.4"/><line class="pl" x1="0" y1="0" x2="0" y2="2.4"/></pattern>
+        </defs>
+        <g id="world"><g id="content"></g><g id="dots"></g></g>
+      </svg>
+      <div class="crumb" id="crumb" hidden><span class="path" id="crumbPath"></span><button class="btn" id="out">← Come back out</button></div>
+      <div class="zoom"><button class="btn" id="zin" aria-label="Zoom in">+</button><button class="btn" id="zout" aria-label="Zoom out">−</button></div>
+      <div class="legend" id="legend">→ go inside · ← come back out · ↓ ↑ move · hover to read · click a dot to inspect · drag to pan · scroll to zoom</div>
+      <div class="tip" id="tip" hidden></div>
+    </section>
+    <aside class="panel">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" id="tWhat" aria-selected="true">What it does</button>
+        <button class="tab" role="tab" id="tHow" aria-selected="false">How it's built</button>
+      </div>
+      <div class="body" id="body"></div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(()=>{
+/* data: what is on nyx and the Pi */
+
+const STATS=[
+  ['Repository','home-server · 5314e7f'],
+  ['Hosts','2 · nyx + raspberrypi'],
+  ['Compose stacks','9 on nyx'],
+  ['Containers','27 on nyx · 5 on the Pi'],
+  ['Hostnames','14 under saulreyna.com'],
+  ['Nightly jobs','5 · 2:00 → 4:30'],
+  ['Offsite','restic → R2 · 7d 5w 12m'],
+];
+
+const COND={
+  disk3:['Disk 3 has logged a reallocated sector','WD20EARS. Replace it first if the count grows.'],
+  old:['Four 2 TB drives from 2009–2011','Healthy for now: low power-on hours, no pending sectors. Long term, two larger modern drives.'],
+  ups:['No UPS','A power cut is an unclean shutdown for the USB enclosure and for the Pi’s SD card. NUT is on the list.'],
+  sd:['The Pi boots from an SD card','Moving it to an SSD is on the list.'],
+  picaddy:['The Pi’s Caddy has no update path','A custom xcaddy binary and no Go on the Pi. Plan: build it from nyx’s proxy/Dockerfile.'],
+  kernel:['Kernel updates wait for a manual reboot','unattended-upgrades installs security fixes daily on both machines but never reboots.'],
+  net50:['Remote access fails from networks using the same LAN range','A common ASUS default. The tailnet route would collide with the local one.'],
+};
+
+const GROUPS=[['door','The front door'],['media','Media'],['data','Your data'],['watch','Keeping watch'],['safe','Kept safe']];
+
+const S=(t)=>t.replace(/^\n/,'');
+const B=[
+ /* front door */
+ {id:'Z',name:'Your devices',g:'door',kind:'open',x:-7.4,y:9,w:2.6,d:1.6,h:1.1,n:'—',
+  hover:'Phone and laptops. At home they use the LAN directly; away, they join the tailnet.',
+  sub:'where every request starts',
+  what:['Every request starts here: the Jellyfin or Immich app on the phone, a browser tab on <code>home.saulreyna.com</code>, a <code>git push</code> to port 2222.',
+        'Away from home the phone is on the <mark>tailnet</mark>, so it reaches the same LAN addresses with the same certificates it uses on the couch. Nothing on the router is forwarded.'],
+  how:{file:'README.md → Remote access, Gitea',snip:S(`
+# ~/.ssh/config on each computer
+Host git.saulreyna.com
+  Port 2222
+# existing git@git.saulreyna.com:… remotes keep working`)},cond:['net50']},
+ {id:'T',name:'Tailscale',g:'door',x:1,y:9,w:2,d:2,h:.55,n:'2',
+  hover:'Both nyx and the Pi advertise <home-lan>/24. One is active; the other takes over in about 15 s.',
+  sub:'two subnet routers for the home LAN',
+  what:['nyx and the Pi are both Tailscale <mark>subnet routers</mark> for <code>&lt;home-lan&gt;/24</code>. One carries the route and the other takes over automatically if it drops off.',
+        'Through the Pi, traffic arrives from a LAN address; through nyx it keeps the phone’s <code>100.x</code> Tailscale address. Caddy lets both into Homepage without a sign-in.'],
+  how:{file:'README.md → Remote access · scripts/setup-nyx-root.sh',snip:S(`
+sudo tailscale up --advertise-routes=<home-lan>/24 --hostname=nyx
+tailscale set --auto-update
+# key expiry off, route approved in the admin console
+# --accept-routes stays off on both (they'd route their own LAN through each other)`)},cond:['net50']},
+ {id:'D',name:'AdGuard Home',g:'door',host:'pi',x:4,y:-7.6,w:2,d:2,h:1.4,n:'1',
+  hover:'The home network’s DNS, on the Pi. Answers *.saulreyna.com itself, so names resolve with the internet down.',
+  sub:'DNS for the whole house, on the Pi',
+  what:['The router hands out the Pi as the DNS server. AdGuard answers <mark>*.saulreyna.com</mark> itself, so home access keeps working when the internet or Cloudflare is down.',
+        'Everything else goes upstream over DNS-over-HTTPS with the AdGuard blocklist. If the Pi is down, devices fall back to the router’s secondary DNS: no ad blocking, but the public records point at the same LAN IPs.'],
+  how:{file:'Pi: ~/home-server · README.md → Home DNS',snip:S(`
+*.saulreyna.com          → <nyx-ip>  (nyx)
+vw kuma ntfy adguard     → <pi-ip>  (Pi)
+me                       → public DNS (Cloudflare Workers)
+everything else          → DoH: Cloudflare + Quad9
+query log + stats        → 7 days`)},cond:['sd','picaddy']},
+ {id:'C',name:'Caddy',g:'door',x:4.5,y:8,w:3,d:3,h:3.2,n:'1',
+  hover:'The only thing listening on 443. One wildcard cert, one handle block per hostname.',
+  sub:'one certificate, every hostname',
+  what:['Caddy is the only thing that answers on 443. It holds <mark>one wildcard certificate</mark> for <code>*.saulreyna.com</code>, issued through the Cloudflare DNS-01 challenge, so no port is open to the internet and a new app never needs a new cert.',
+        'Each hostname is a <code>handle</code> block that proxies to a container by name over the shared <code>arr_network</code>. Homepage has no login, so Caddy sends anyone outside the home network and Tailscale to Authelia first. Any other subdomain gets its connection dropped.'],
+  how:{file:'proxy/Caddyfile · proxy/Dockerfile · proxy/docker-compose.yml',image:'caddy:2 built with caddy-dns/cloudflare (xcaddy)',ports:'80 · 443 · 443/udp (HTTP/3)',snip:S(`
+@homepage host {$HOMEPAGE_DOMAIN}
+handle @homepage {
+	@outside not remote_ip private_ranges 100.64.0.0/10
+	route @outside {
+		import authelia
+	}
+	reverse_proxy homepage:3000
+}`)},cond:[],
+  inside:[
+   {name:'Resolve the name',desc:'AdGuard on the Pi answers every <code>*.saulreyna.com</code> name with nyx’s LAN address. Away from home, the same answer comes back and the tailnet carries the packet.',snip:'media.saulreyna.com  A  <nyx-ip>\n(DHCP reservation on the router)'},
+   {name:'Terminate TLS',desc:'One wildcard certificate covers every app. Caddy renews it over DNS-01 with a Cloudflare token, so port 80 is never needed for validation.',snip:'(cloudflare_tls) {\n\ttls {\n\t\tdns cloudflare {env.CF_API_TOKEN}\n\t}\n}\n# certs persist in proxy/data',h:1.8},
+   {name:'Match the host',desc:'A named matcher per hostname picks the handle block.',snip:'@immich host {$IMMICH_DOMAIN}\nhandle @immich {\n\treverse_proxy immich_server:2283\n}'},
+   {name:'Home or sign-in',desc:'Homepage has no login. The home network and Tailscale go straight in; anyone else signs in with Authelia first.',snip:'@outside not remote_ip private_ranges 100.64.0.0/10\nroute @outside {\n\timport authelia\n}',h:1.5},
+   {name:'Proxy by name',desc:'Containers on <code>arr_network</code> are reached by container name. Jellyfin also gets compression; WebSockets are upgraded automatically.',snip:'jellyfin:8096          immich_server:2283\nocis:9200              homepage:3000\ngitea:3000             firefly:8080\nfirefly-importer:8080  vikunja:3456\nkavita:5000            speedtest-tracker:80',h:2},
+   {name:'Drop the rest',desc:'Any other subdomain that points here gets its connection dropped.',snip:'handle {\n\tabort\n}',h:.8},
+  ]},
+ /* media */
+ {id:'J',name:'Jellyfin',g:'media',x:21,y:1.5,w:4.6,d:4.6,h:2.2,n:'1',
+  hover:'Streams the library at media.saulreyna.com. Transcodes on the Intel iGPU with QuickSync.',
+  sub:'media.saulreyna.com',
+  what:['Streams the movie and TV library. Libraries point at <code>/data/media</code> on the pool, read-only in practice.',
+        'nyx’s Intel iGPU is passed through as <code>/dev/dri</code>, so transcoding runs on <mark>QuickSync</mark> instead of the CPU.'],
+  how:{file:'media/docker-compose.yml',image:'lscr.io/linuxserver/jellyfin:latest',ports:'8096 (Caddy: media.saulreyna.com)',snip:S(`
+jellyfin:
+  volumes:
+    - \${DATA_ROOT}/media:/data/media
+  devices:
+    - /dev/dri:/dev/dri       # Intel iGPU → QSV transcoding
+  group_add:
+    - "\${RENDER_GID}"`)},cond:[]},
+ /* data */
+ {id:'I',name:'Immich',g:'data',x:10,y:9.5,w:3,d:3,h:2.8,n:'4',
+  hover:'Photos at photos.saulreyna.com. Originals on the pool, Postgres on the NVMe.',
+  sub:'photos.saulreyna.com',
+  what:['The phone backs up every photo and video here. Originals, thumbnails and encoded video go to the pool; the database stays on the NVMe because Immich doesn’t support Postgres on FUSE filesystems like mergerfs.',
+        'Photos are the part of this house that <mark>can’t be re-downloaded</mark>. They are what the parity disk is really for.'],
+  how:{file:'immich/docker-compose.yml · immich/hwaccel.transcoding.yml',image:'immich-server, immich-machine-learning :${IMMICH_VERSION:-release} · valkey:9 · immich postgres 14 + vectorchord',ports:'2283',snip:S(`
+#   UPLOAD_LOCATION  (photos, thumbs, DB dumps) -> mergerfs pool
+#   DB_DATA_LOCATION (Postgres)                 -> local NVMe
+immich-server:
+  extends:
+    file: hwaccel.transcoding.yml
+    service: quicksync`)},
+  inside:[
+   {name:'immich_server',desc:'API and web app. Joins both its private network and <code>arr_network</code> so Caddy can reach it.',snip:'immich_server :2283\nnetworks: default + arr_network\nQSV transcoding via hwaccel.transcoding.yml',h:2},
+   {name:'Machine learning',desc:'Faces and smart search, on the CPU. It could move to the iGPU with the -openvino tag.',snip:'immich_machine_learning\nvolumes: model-cache:/cache'},
+   {name:'Valkey',desc:'Job queues for thumbnails, encoding and ML.',snip:'docker.io/valkey/valkey:9@sha256:c123e3…\nhealthcheck: redis-cli ping',h:.9},
+   {name:'Postgres',desc:'Assets, albums and embeddings. On the NVMe, with data checksums.',snip:'ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0\nPOSTGRES_INITDB_ARGS: --data-checksums\nshm_size: 128mb',h:1.6},
+   {name:'Library on the pool',desc:'Originals, thumbnails and encoded video under <code>/mnt/storage/photos</code>, protected by snapraid parity.',snip:'${UPLOAD_LOCATION}:/data\n→ /mnt/storage/photos'},
+   {name:'Nightly DB dumps',desc:'Immich writes its own database dumps next to the library. The offsite job uploads those (not the photos) to R2.',snip:'/mnt/storage/photos/backups → restic → R2'},
+  ]},
+ {id:'O',name:'ownCloud Infinite Scale',g:'data',x:14.5,y:10,w:2.6,d:2.6,h:2,n:'1',
+  hover:'Documents at cloud.saulreyna.com. One container, no external database.',
+  sub:'cloud.saulreyna.com',
+  what:['Documents and file sync. oCIS stores files in its own format, folders named by UUID, so you reach them through the web UI, the apps or WebDAV, never by browsing the pool.',
+        'Config and metadata live on the NVMe; everyone’s files live on the pool. Login uses OIDC redirects to <code>OCIS_URL</code>, so it only works through Caddy.'],
+  how:{file:'cloud/docker-compose.yml',image:'owncloud/ocis:8',ports:'9200 (behind Caddy only)',snip:S(`
+entrypoint: ["/bin/sh"]
+command: ["-c", "ocis init || true; exec ocis server"]
+volumes:
+  - ./config:/etc/ocis
+  - ./data:/var/lib/ocis
+  - \${OCIS_STORAGE}:/var/lib/ocis/storage/users`)}},
+ {id:'G',name:'Gitea',g:'data',x:18.5,y:10,w:2.6,d:2.6,h:2.4,n:'3',
+  hover:'git.saulreyna.com, with MySQL and an Actions runner. Git over SSH on port 2222.',
+  sub:'git.saulreyna.com',
+  what:['Moved here from the Pi with its version pinned. The web UI goes through Caddy; <mark>git over SSH</mark> uses port 2222 directly.',
+        'An Actions runner executes jobs in throwaway containers on nyx’s own Docker.'],
+  how:{file:'gitea/docker-compose.yml · gitea/runner/config.yaml',image:'gitea:1.26.2 · mysql:8.4.9 · act_runner:0.6.1',ports:'3000 (Caddy) · 2222 → 22',snip:'gitea:\n  environment:\n    - GITEA__database__HOST=gitea-db:3306\n    - GITEA__server__SSH_PORT=2222\n  ports:\n    - 2222:22'},
+  inside:[
+   {name:'Gitea',desc:'Pinned to the version that ran on the Pi. Diun reports newer x.y.z tags.',snip:'docker.gitea.com/gitea:1.26.2\ndiun.include_tags=^\\d+\\.\\d+\\.\\d+$',h:2},
+   {name:'SSH on 2222',desc:'Clone URLs show port 2222. Each computer gets one stanza in ~/.ssh/config.',snip:'ports: 2222:22\nGITEA__server__SSH_PORT=2222'},
+   {name:'MySQL 8.4 LTS',desc:'On the NVMe. Gitea waits for the healthcheck before starting.',snip:'mysql:8.4.9\ndiun.include_tags=^8\\.4\\.\\d+$   # stay on the LTS line',h:1.5},
+   {name:'Actions runner',desc:'Already registered, so no token is needed. Runs jobs through the Docker socket.',snip:'gitea/act_runner:0.6.1\n/var/run/docker.sock:/var/run/docker.sock'},
+   {name:'Nightly dump',desc:'The offsite job dumps the database and copies the SSH host keys, so clients don’t see a "host key changed" warning after a restore.',snip:'mysqldump --single-transaction … gitea | gzip\ndocker exec gitea tar -C /data -czf - ssh git/.ssh',h:1.1},
+  ]},
+ {id:'F',name:'Firefly III',g:'data',x:22.5,y:10,w:2.6,d:2.6,h:1.8,n:'5',
+  hover:'Personal finance at firefly.saulreyna.com, plus the data importer and a daily cron.',
+  sub:'firefly.saulreyna.com · importer.saulreyna.com',
+  what:['Moved from the Pi with its settings files copied unchanged. <code>APP_KEY</code> in <code>firefly.env</code> <mark>encrypts the data</mark>: never change it, never lose it.',
+        'Images are pinned to the versions migrated from the Pi and bumped deliberately.'],
+  how:{file:'firefly/docker-compose.yml',image:'fireflyiii/core:version-6.2.10 · mariadb:12.3.2 · redis:7.4-alpine · data-importer:version-2.3.2 · alpine:3.22',ports:'8080 (Caddy)',snip:'firefly-cron:\n  command: >-\n    echo "0 3 * * * wget -qO- http://firefly:8080/api/v1/cron/$$STATIC_CRON_TOKEN"\n    | crontab - && crond -f'},
+  inside:[
+   {name:'Firefly core',desc:'The app. DB and Redis hostnames are overridden from the Pi-era settings file.',snip:'fireflyiii/core:version-6.2.10\nDB_HOST=firefly-db\nREDIS_HOST=firefly-redis',h:2},
+   {name:'MariaDB',desc:'On the NVMe, healthchecked before Firefly starts.',snip:'mariadb:12.3.2\nhealthcheck.sh --connect --innodb_initialized',h:1.5},
+   {name:'Redis',desc:'Cache and sessions.',snip:'redis:7.4-alpine',h:.9},
+   {name:'Data importer',desc:'Trusts Caddy’s forwarded headers so redirects use https://.',snip:'TRUSTED_PROXIES=**\nAPP_URL=https://importer.saulreyna.com'},
+   {name:'Daily cron',desc:'Recurring transactions and bills run at 3:00 New York time.',snip:'0 3 * * *  wget http://firefly:8080/api/v1/cron/$STATIC_CRON_TOKEN',h:1},
+  ]},
+ {id:'X1',name:'Vikunja',g:'data',sub2:'apps',x:10,y:15,w:1.6,d:1.6,h:1.2,n:'1',
+  hover:'To-do lists at todo.saulreyna.com. SQLite on the NVMe, email through Mailjet.',sub:'todo.saulreyna.com',
+  what:['To-do lists. A single container with its SQLite database on the NVMe and reminder emails sent through Mailjet.'],
+  how:{file:'apps/docker-compose.yml',image:'vikunja/vikunja:2.1.0',ports:'3456 (Caddy)',snip:'VIKUNJA_DATABASE_PATH: /db/vikunja.db\nVIKUNJA_MAILER_HOST: in-v3.mailjet.com'}},
+ {id:'X2',name:'Kavita',g:'data',sub2:'apps',x:12.3,y:15,w:1.6,d:1.6,h:1.2,n:'1',
+  hover:'Books and comics at kavita.saulreyna.com. The library is on the pool.',sub:'kavita.saulreyna.com',
+  what:['Books and comics. Its database and covers stay on the NVMe; the library itself is <code>/mnt/storage/data/media/books</code>.'],
+  how:{file:'apps/docker-compose.yml',image:'lscr.io/linuxserver/kavita:v0.9.0.2-ls111',ports:'5000 (Caddy)',snip:'volumes:\n  - ./kavita/config:/config\n  - /mnt/storage/data/media/books:/library'}},
+ {id:'X3',name:'Speedtest Tracker',g:'data',sub2:'apps',x:14.6,y:15,w:1.6,d:1.6,h:1.2,n:'1',
+  hover:'Runs a speed test every two hours at :06. speed.saulreyna.com',sub:'speed.saulreyna.com',
+  what:['Measures the home connection every two hours and charts it.'],
+  how:{file:'apps/docker-compose.yml',image:'lscr.io/linuxserver/speedtest-tracker:1.14.3',ports:'80 (Caddy)',snip:'SPEEDTEST_SCHEDULE=6 */2 * * *   # every 2 hours at :06\nDB_CONNECTION=sqlite'}},
+ /* watch */
+ {id:'H',name:'Homepage',g:'watch',x:4.5,y:14,w:2.6,d:2.6,h:1.6,n:'1',
+  hover:'The landing page with live status for every service. Authelia sign-in from outside the home network and Tailscale.',sub:'home.saulreyna.com',
+  what:['Links and live widgets for every service on nyx. It reads container status from the Docker socket (read-only) and pool usage from <code>/mnt/storage</code>.',
+        'It has no login, so Caddy only serves it to <mark>private IPs</mark>. The tailnet counts, because its traffic arrives from a LAN address.'],
+  how:{file:'dashboard/docker-compose.yml · dashboard/config/services.yaml',image:'ghcr.io/gethomepage/homepage:latest',ports:'3000',snip:'volumes:\n  - ./config:/app/config\n  - /var/run/docker.sock:/var/run/docker.sock:ro\n  - /mnt/storage:/mnt/storage:ro   # disk widget only'}},
+ {id:'DN',name:'Diun',g:'watch',x:1.4,y:17.6,w:1.8,d:1.8,h:1.1,n:'2',
+  hover:'Saturdays at 9:00: checks for new image versions and posts to ntfy. Never updates anything.',sub:'one on nyx, one on the Pi',
+  what:['Diun reports, you decide. Images on a moving tag (<code>latest</code>, <code>v3</code>, <code>8</code>) are reported when the tag gets a new image; pinned images use <code>diun.*</code> labels to report newer version tags.',
+        'Caddy is built locally, so Diun watches its base image <code>caddy:2</code> instead.'],
+  how:{file:'diun/docker-compose.yml · diun/images.yml',image:'crazymax/diun:4.33.0',snip:'DIUN_WATCH_SCHEDULE=0 9 * * 6\nDIUN_NOTIF_NTFY_ENDPOINT=https://ntfy.saulreyna.com\nDIUN_NOTIF_NTFY_TOPIC=updates'}},
+ {id:'K',name:'Uptime Kuma',g:'watch',host:'pi',x:10,y:-7.6,w:2,d:2,h:1.4,n:'1',
+  hover:'Watches everything on nyx from the Pi, so it still alerts when nyx is down.',sub:'kuma.saulreyna.com · on the Pi',
+  what:['Kuma lives on the Pi <mark>on purpose</mark>: if nyx goes down, the thing that notices is still up.',
+        'Its Backups group holds push monitors. They go down if a backup script hasn’t reported success within 25 hours.'],
+  how:{file:'scripts/notify.sh · README.md → Notifications',snip:'kuma_push() {\n  curl -fsS -m 20 -G --data-urlencode "status=up" --data-urlencode "msg=$2" \\\n    "https://kuma.saulreyna.com/api/push/$1"\n}'},cond:['sd','picaddy']},
+ {id:'N',name:'ntfy',g:'watch',host:'pi',x:13,y:-7.6,w:2,d:2,h:1.4,n:'1',
+  hover:'Phone notifications. Deny-all; a write-only publisher token for scripts.',sub:'ntfy.saulreyna.com · on the Pi',
+  what:['Every alert in the house ends up here: <code>alerts</code> (Kuma), <code>backups</code>, <code>disks</code> (smartd) and <code>updates</code> (Diun).',
+        'Access is deny-all. The phone logs in as <code>saul</code>; scripts use a <mark>write-only</mark> publisher token. ntfy.sh only relays a poll ping for instant iOS push, never the message.'],
+  how:{file:'scripts/notify.sh',snip:'ntfy() {\n  curl -fsS -m 20 -H "Authorization: Bearer $NTFY_TOKEN" -H "Title: $2" \\\n    -H "Priority: ${4:-default}" -d "$3" "$NTFY_URL/$1"\n}'},cond:['sd','picaddy']},
+ /* safe */
+ {id:'V',name:'Vaultwarden',g:'safe',host:'pi',x:7,y:-7.6,w:2,d:2,h:1.4,n:'1',
+  hover:'Passwords, on the Pi. nyx pulls a consistent snapshot every night at 3:15.',sub:'vw.saulreyna.com · on the Pi',
+  what:['The password vault, including the restic password that decrypts the offsite backups.',
+        'Every night nyx connects over SSH, has Vaultwarden take an <mark>online backup</mark> of its own database, and streams it back as a tarball onto the pool.'],
+  how:{file:'scripts/backup-vaultwarden.sh',snip:'ssh saul@<pi-ip> \'docker exec vaultwarden sh -euc "\n  /vaultwarden backup >&2\n  tar -C /data -czf - --exclude=./db.sqlite3 … ."\''},cond:['sd','picaddy']},
+ {id:'M',name:'Storage pool',g:'safe',kind:'stack',layers:3,x:17,y:15.5,w:6,d:4.5,h:.42,gap:.16,n:'3',
+  hover:'Three 2 TB disks merged into /mnt/storage with mergerfs, in a TerraMaster USB enclosure.',sub:'/mnt/storage · mergerfs over disk1–3',
+  what:['Three disks merged into one tree with <mark>mergerfs</mark>. Media, photos, oCIS files and backups live here. Databases and oCIS metadata never do.',
+        'Docker won’t start until the pool is mounted, so a container can’t quietly write into the empty mountpoint on the NVMe.'],
+  how:{file:'README.md → Storage · One-time setup',snip:'/mnt/storage/\n├── data/      downloads/{tv,movies} · media/{tv,movies,books}\n├── photos/    Immich library + nightly DB dumps\n├── cloud/     oCIS user files\n└── backups/   vaultwarden/ · dumps/ · offsite.log\n\n[Unit]\nRequiresMountsFor=/mnt/storage   # docker.service.d/storage.conf'},cond:['disk3','old','ups'],
+  inside:[
+   {name:'disk1',desc:'2 TB WD, data.',snip:'/mnt/disk1  (data)',h:1},
+   {name:'disk2',desc:'2 TB WD, data.',snip:'/mnt/disk2  (data)',h:1},
+   {name:'disk3',desc:'2 TB WD20EARS, data. One reallocated sector logged: the first to replace if the count grows.',snip:'/mnt/disk3  WD20EARS\nreallocated sectors: 1',h:1,flag:true},
+   {name:'mergerfs',desc:'Presents the three as one tree.',snip:'/mnt/storage  ← disk1 + disk2 + disk3',h:1.6},
+   {name:'snapraid sync',desc:'At 3:30 a systemd timer computes parity onto the fourth disk. Downloads are excluded.',snip:'03:30  snapraid sync → /mnt/parity1\nexclude data/downloads/',h:1.3},
+   {name:'smartd',desc:'Short self-test daily at 2:00, long test Saturdays at 3:00, alerts above 45°C or on new bad sectors.',snip:'-W 4,45,55 -m <nomailer> -M exec /usr/local/bin/smartd-ntfy\n→ ntfy topic "disks", priority urgent'},
+  ]},
+ {id:'PA',name:'Parity disk',g:'safe',x:24.3,y:16,w:1.8,d:3.2,h:1.3,n:'—',
+  hover:'snapraid parity for disk1–3, synced nightly at 3:30. Survives a dead drive, not a deletion.',sub:'/mnt/parity1 · snapraid',
+  what:['If one data disk dies, snapraid can rebuild it from the other two plus this one. It is <mark>not a backup</mark>: a deleted file is gone from parity after the next sync.'],
+  how:{file:'README.md → Backups',snip:'03:30  snapraid sync (systemd timer)\nexclude: data/downloads/'},cond:['old']},
+ {id:'E',name:'NVMe',g:'safe',x:11,y:19.2,w:3.6,d:1.8,h:.45,n:'—',
+  hover:'The system disk. App configs and every database live here, never on mergerfs.',sub:'WD SN720 256 GB · system disk',
+  what:['Every database stays on the NVMe: Immich’s Postgres, Gitea’s MySQL, Firefly’s MariaDB, oCIS metadata and the SQLite files. <mark>Databases must not go on mergerfs.</mark>',
+        'smartd watches it too, with NVMe temperature limits.'],
+  how:{file:'README.md → Storage · scripts/setup-nyx-root.sh',snip:'*/config  immich/postgres  cloud/config  cloud/data\ngitea/db  firefly/db  apps/*\n\nnvme-WDC_PC_SN720_SDAQNTW-256G… -a -W 0,70,80'}},
+ {id:'B',name:'Backup jobs',g:'safe',x:6.5,y:18.5,w:2.6,d:2.6,h:1.8,n:'cron',
+  hover:'3:15 pull Vaultwarden from the Pi; 4:30 dump every database and ship a restic snapshot to R2.',sub:'scripts/ · saul’s crontab on nyx',
+  what:['Two scripts, one rule: <mark>only small, irreplaceable data</mark> goes offsite. Movies, TV, books and the photos themselves stay home.',
+        'Each step names itself, so a failure alert says which step broke and the last error it printed. Success pings a Kuma push monitor; silence for 25 hours is its own alert.'],
+  how:{file:'scripts/backup-offsite.sh · scripts/backup-vaultwarden.sh · scripts/restic-excludes.txt',snip:'restic backup --tag nightly \\\n  --exclude-file restic-excludes.txt --exclude-larger-than 100M \\\n  /home/saul/home-server /mnt/storage/backups /mnt/storage/photos/backups'},
+  inside:[
+   {name:'Vaultwarden pull',desc:'03:15. Snapshot on the Pi, stream it over SSH, check the archive has the DB snapshot and rsa_key.pem, keep 30 days.',snip:'vaultwarden-2026-10-20_0315.tar.gz\ndb_*.sqlite3 · rsa_key.pem · config.json · attachments/ · sends/',h:1.5},
+   {name:'Gitea dump',desc:'04:30 starts here. Written to .part and kept only if the dump says it completed.',snip:'mysqldump --single-transaction --routines --triggers --events gitea\n| gzip > gitea.sql.gz.part   # "Dump completed" check'},
+   {name:'Firefly dump',desc:'Same pattern for MariaDB.',snip:'mariadb-dump --single-transaction --routines --triggers\n| gzip > firefly.sql.gz.part'},
+   {name:'Gitea SSH keys',desc:'Root-only inside the container, so they are copied out separately.',snip:'docker exec gitea tar -C /data -czf - ssh git/.ssh',h:.9},
+   {name:'SQLite copies',desc:'SQLite’s online backup API gives consistent copies of every database under home-server while the apps keep running.',snip:'s = sqlite3.connect(src, timeout=60)\nd = sqlite3.connect(out + ".part")\ns.backup(d)'},
+   {name:'oCIS mirror',desc:'oCIS has no dump tool, so it is stopped for a few seconds while config, metadata and files are mirrored.',snip:'docker stop ocis\nrsync -a --delete --max-size=100M …\ndocker start ocis',h:1.1},
+   {name:'Pi configs',desc:'Compose file, Caddyfile and .env from the Pi, plus consistent copies of the Kuma and ntfy databases.',snip:'tar -czf - docker-compose.yaml caddy/Caddyfile .env\nkuma.db · ntfy-user.db  → pi/dbs.tar.gz'},
+   {name:'Upload to R2',desc:'One restic snapshot of configs, secrets, dumps and Immich’s DB dumps. Exit 3 means some files were unreadable and sends a softer warning.',snip:'repo: Cloudflare R2  bucket nyx-backups  path /nyx\nrestic backup --tag nightly …',h:2},
+   {name:'Retention',desc:'Keep 7 daily, 5 weekly, 12 monthly. Data is only pruned on Sundays.',snip:'restic forget --keep-daily 7 --keep-weekly 5 --keep-monthly 12 [--prune on Sun]'},
+   {name:'Monthly check',desc:'On the 1st, re-download and verify 5% of the stored data.',snip:'restic check --read-data-subset=5%',h:.9},
+   {name:'Report',desc:'Success pings Kuma with the size added. Any failed step sends a high-priority ntfy alert instead.',snip:'kuma_push "$KUMA_PUSH_OFFSITE" "OK, added …"\n# or: ntfy backups "Offsite backup FAILED" "<step> failed: <reason>"'},
+  ]},
+ {id:'R2',name:'Cloudflare R2',g:'safe',kind:'open',x:31,y:14.5,w:3,d:3,h:1.6,n:'—',
+  hover:'Offsite restic repository, bucket nyx-backups. Encrypted; the password is also in Vaultwarden.',sub:'bucket nyx-backups · path /nyx',
+  what:['The copy that survives the house. A restic repository, <mark>encrypted</mark> before it leaves nyx.',
+        'The password is in <code>scripts/restic-password</code> and in Vaultwarden. Without it the backups can’t be decrypted.'],
+  how:{file:'scripts/restic.env · README.md → Backups',snip:'set -a; . scripts/restic.env; set +a\nrestic snapshots\nrestic restore latest --target /tmp/restore \\\n  --include /mnt/storage/backups/dumps'}},
+];
+
+const PLATES=[
+  {x:0,y:0,w:27.6,d:22.2,label:'NYX · INTEL NUC 11 PRO · DEBIAN 13'},
+  {x:3,y:-9,w:12.4,d:4.4,label:'RASPBERRYPI',dash:true},
+  {x:-9.2,y:7.4,w:6.6,d:4.8,label:'YOUR DEVICES',dash:true},
+  {x:29.4,y:12.8,w:6.2,d:6.4,label:'OFFSITE',dash:true},
+];
+
+const EDGES=[
+ ['Z','T','xy'],['T','C','xy'],['Z','D','yx'],
+ ['C','J','yx'],['C','I','xy'],['C','O','xy'],['C','G','xy'],['C','F','xy'],['C','H','yx'],['C','X2','xy'],
+ ['J','M','xy'],
+ ['I','M','xy'],['O','M','xy'],['I','E','yx'],['G','E','xy'],['F','E','xy'],
+ ['M','PA','xy'],['B','M','xy'],['B','V','xy'],['B','R2','xy'],['B','K','xy',1],
+ ['K','C','yx',1],['K','N','xy'],['DN','N','yx'],['N','Z','xy'],
+];
+
+/* each hop: [from, to, snippet] */
+const FLOWS=[
+ {id:'dns',name:'Look up a name at home',hops:[
+  ['Z','D','query   A   media.saulreyna.com\nfrom    phone on home Wi-Fi\nserver  <pi-ip> (handed out by the router)'],
+  ['D','Z','answer  A   <nyx-ip>\nsource  local wildcard rewrite, no upstream lookup\nworks with the internet down'],
+ ]},
+ {id:'watch',name:'Play an episode away from home',hops:[
+  ['Z','T','phone on the tailnet → subnet router\ndst <nyx-ip>:443\nactive router: nyx or raspberrypi (~15 s failover)'],
+  ['T','C','GET / HTTP/2\nHost: media.saulreyna.com\ncert: *.saulreyna.com (wildcard, DNS-01)\narrives from a LAN address'],
+  ['C','J','@jellyfin host media.saulreyna.com\nreverse_proxy jellyfin:8096\nencode zstd gzip · WebSocket upgraded for playback sync'],
+ ]},
+ {id:'photo',name:'Back up a photo from the phone',hops:[
+  ['Z','T','Immich app, background backup\nPOST https://photos.saulreyna.com/api/assets'],
+  ['T','C','@immich host photos.saulreyna.com\nreverse_proxy immich_server:2283'],
+  ['C','I','multipart upload   IMG_4417.HEIC   (example)\nqueues thumbnail, encode and ML jobs in Valkey'],
+  ['I','M','original → /mnt/storage/photos/…\nthumbnails + encoded video beside it on the pool'],
+  ['M','I','saved · snapraid parity covers it after 03:30'],
+  ['I','E','asset row + CLIP embedding → immich_postgres\non the NVMe (Postgres never goes on mergerfs)'],
+ ]},
+ {id:'nightly',name:'Nightly backups, 3:15 → 4:30',hops:[
+  ['B','V','03:15  backup-vaultwarden.sh\nssh -o BatchMode=yes saul@<pi-ip>\ndocker exec vaultwarden /vaultwarden backup'],
+  ['V','B','tar stream: db_<stamp>.sqlite3 · rsa_key.pem · config.json · attachments/ · sends/\narchive check passed'],
+  ['B','M','→ /mnt/storage/backups/vaultwarden/vaultwarden-2026-10-20_0315.tar.gz\nkept 30 days'],
+  ['M','B','04:30  backup-offsite.sh\ndumps refreshed: gitea.sql.gz · firefly.sql.gz · sqlite/ · ocis/ · pi/'],
+  ['B','R2','restic backup --tag nightly --exclude-larger-than 100M\n  ~/home-server  /mnt/storage/backups  /mnt/storage/photos/backups\n→ R2 bucket nyx-backups, path /nyx'],
+  ['R2','B','snapshot saved · forget 7d/5w/12m (prune on Sundays)'],
+  ['B','K','kuma_push $KUMA_PUSH_OFFSITE "OK, added …"\nthe Backups group stays up for another 25 h'],
+ ]},
+ {id:'alert',name:'A monitor goes down',hops:[
+  ['K','C','Uptime Kuma (on the Pi) → https://media.saulreyna.com\nHTTP check · no answer'],
+  ['C','K','monitor DOWN\nKuma runs on the Pi, so it still alerts when nyx is off'],
+  ['K','N','POST https://ntfy.saulreyna.com/alerts\nAuthorization: Bearer <publisher token, write-only>'],
+  ['N','Z','push to the phone app (user saul)\nntfy.sh relays only a poll ping, never the message'],
+ ]},
+ {id:'update',name:'Saturday update check',hops:[
+  ['DN','N','Sat 09:00  Diun scans the images on nyx\npinned gitea:1.26.2 · watching ^\\d+\\.\\d+\\.\\d+$ tags\nPOST ntfy  topic=updates  priority=3  tags=package'],
+  ['N','Z','a notice only · Diun never updates anything\ncd gitea && docker compose pull && docker compose up -d'],
+ ]},
+ {id:'parity',name:'Parity sync',hops:[
+  ['M','PA','03:30  snapraid sync (systemd timer)\ndisk1 + disk2 + disk3 → parity1\nprotects against a dead drive, not a deletion'],
+ ]},
+];
+
+const FOLDERS=[
+ ['proxy/','Caddy, one *.saulreyna.com cert','1'],['media/','Jellyfin (the rest of the folder is a private repo)','—'],
+ ['immich/','Immich photos','4'],['cloud/','ownCloud Infinite Scale','1'],['dashboard/','Homepage','1'],
+ ['gitea/','Gitea, MySQL, Actions runner','3'],['firefly/','Firefly III, MariaDB, Redis, importer, cron','5'],
+ ['apps/','Vikunja, Kavita, Speedtest Tracker','3'],['diun/','Diun image notices','1'],['scripts/','backups, notify.sh, root setup','—'],
+];
+
+/* geometry */
+const U=19, CX=Math.cos(Math.PI/6);
+const P=(x,y,z=0)=>[(x-y)*CX*U,(x+y)*.5*U-z*U];
+const ptsS=a=>a.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+const NS='http://www.w3.org/2000/svg';
+const el=(tag,attrs={},parent)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function foot(b){
+  if(b.kind==='cards'){const W=b.cards*b.w+(b.cards-1)*b.gap;return[b.x,b.y,b.x+W,b.y+b.d]}
+  return[b.x,b.y,b.x+b.w,b.y+b.d];
+}
+const center=b=>{const f=foot(b);return[(f[0]+f[2])/2,(f[1]+f[3])/2]};
+function route(a,b,mode){
+  const [x1,y1]=center(a),[x2,y2]=center(b);
+  return mode==='yx'?[[x1,y1],[x1,y2],[x2,y2]]:[[x1,y1],[x2,y1],[x2,y2]];
+}
+
+function box(g,x,y,z,w,d,h){
+  const top=[P(x,y,z+h),P(x+w,y,z+h),P(x+w,y+d,z+h),P(x,y+d,z+h)];
+  const rt=[P(x+w,y,z),P(x+w,y+d,z),P(x+w,y+d,z+h),P(x+w,y,z+h)];
+  const lf=[P(x,y+d,z),P(x+w,y+d,z),P(x+w,y+d,z+h),P(x,y+d,z+h)];
+  if(h>0){el('polygon',{class:'face rt',points:ptsS(rt)},g);el('polygon',{class:'face lf',points:ptsS(lf)},g)}
+  el('polygon',{class:'face top',points:ptsS(top)},g);
+  return top;
+}
+function floorText(parent,x,y,str,cls){
+  const [sx,sy]=P(x,y);
+  const t=el('text',{class:cls,transform:`matrix(${CX.toFixed(4)},0.5,${(-CX).toFixed(4)},0.5,${sx.toFixed(1)},${sy.toFixed(1)})`},parent);
+  t.textContent=str;return t;
+}
+
+/* scenes */
+const byId=Object.fromEntries(B.map(b=>[b.id,b]));
+const MAIN={id:'main',blocks:B,plates:PLATES,edges:EDGES,flows:FLOWS,order:B.map(b=>b.id)};
+
+function stepScene(owner){
+  const steps=owner.inside, per=4, blocks=[], edges=[], hops=[];
+  steps.forEach((s,i)=>{
+    const row=Math.floor(i/per), col=i%per, c=row%2?per-1-col:col;
+    blocks.push({id:'s'+i,code:String(i+1),name:s.name,x:c*5.2,y:row*6.4,w:2.6,d:2.6,h:s.h||1.4,step:s,idx:i,flagged:s.flag});
+    if(i){
+      const pr=Math.floor((i-1)/per);
+      edges.push(['s'+(i-1),'s'+i,pr!==row?'yx':'xy']);
+      hops.push(['s'+(i-1),'s'+i,s.snip]);
+    }
+  });
+  hops.push(['s'+(steps.length-1),'s0',steps[0].snip]);
+  // close the loop along the back with a faint return edge
+  edges.push(['s'+(steps.length-1),'s0','yx',1]);
+  const rows=Math.ceil(steps.length/per);
+  const plates=[{x:-1.6,y:-1.6,w:(Math.min(per,steps.length)-1)*5.2+5.8,d:(rows-1)*6.4+6.4,label:'INSIDE · '+owner.name.toUpperCase()}];
+  return{id:owner.id,owner,blocks,plates,edges,flows:[{id:'in-'+owner.id,name:'Inside '+owner.name,hops}],order:blocks.map(b=>b.id),inside:true};
+}
+
+/* state */
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+let scene=MAIN, sel=null, selDot=null, tab='what', playing=!reduce;
+let view={k:1,tx:0,ty:0};
+let flowsLive=[];
+let blockEls={}, edgeEls=[];
+
+const $=id=>document.getElementById(id);
+const svg=$('svg'),world=$('world'),content=$('content'),dotsG=$('dots'),stage=$('stage'),tip=$('tip');
+
+/* render scene */
+function render(){
+  content.textContent='';dotsG.textContent='';blockEls={};edgeEls=[];
+  const sb=Object.fromEntries(scene.blocks.map(b=>[b.id,b]));
+  // grid
+  const f=scene.blocks.map(foot);
+  const gx0=Math.floor(Math.min(...f.map(a=>a[0]),...scene.plates.map(p=>p.x))-4),gx1=Math.ceil(Math.max(...f.map(a=>a[2]),...scene.plates.map(p=>p.x+p.w))+4);
+  const gy0=Math.floor(Math.min(...f.map(a=>a[1]),...scene.plates.map(p=>p.y))-4),gy1=Math.ceil(Math.max(...f.map(a=>a[3]),...scene.plates.map(p=>p.y+p.d))+4);
+  let d='';
+  for(let x=gx0;x<=gx1;x+=2){const a=P(x,gy0),b=P(x,gy1);d+=`M${a[0].toFixed(1)} ${a[1].toFixed(1)}L${b[0].toFixed(1)} ${b[1].toFixed(1)}`}
+  for(let y=gy0;y<=gy1;y+=2){const a=P(gx0,y),b=P(gx1,y);d+=`M${a[0].toFixed(1)} ${a[1].toFixed(1)}L${b[0].toFixed(1)} ${b[1].toFixed(1)}`}
+  el('path',{class:'grid',d},content);
+  const fitG=el('g',{id:'fitg'},content);
+  // plates
+  for(const p of scene.plates){
+    el('polygon',{class:'plate'+(p.dash?' dash':''),points:ptsS([P(p.x,p.y),P(p.x+p.w,p.y),P(p.x+p.w,p.y+p.d),P(p.x,p.y+p.d)])},fitG);
+    floorText(fitG,p.x+.25,p.y-.3,p.label,'plabel');
+  }
+  // edges
+  for(const [a,b,mode,faint] of scene.edges){
+    const r=route(sb[a],sb[b],mode).map(q=>P(q[0],q[1]));
+    const pe=el('polyline',{class:'edge'+(faint?' faint':''),points:ptsS(r)},fitG);
+    edgeEls.push({a,b,el:pe});
+    if(!faint){const k=r[1];el('rect',{class:'knot',x:k[0]-2.6,y:k[1]-2.6,width:5.2,height:5.2,transform:`rotate(45 ${k[0].toFixed(1)} ${k[1].toFixed(1)})`},fitG)}
+  }
+  // blocks, back to front
+  const sorted=[...scene.blocks].sort((p,q)=>{const a=foot(p),b=foot(q);return(a[0]+a[2]+a[1]+a[3])-(b[0]+b[2]+b[1]+b[3])});
+  for(const b of sorted){
+    const g=el('g',{class:'blk'+(b.kind==='open'?' open':''),tabindex:'-1','data-id':b.id},fitG);
+    let top;
+    if(b.kind==='cards'){for(let i=0;i<b.cards;i++)top=box(g,b.x+i*(b.w+b.gap),b.y,0,b.w,b.d,b.h)}
+    else if(b.kind==='stack'){for(let i=0;i<b.layers;i++)top=box(g,b.x,b.y,i*(b.h+b.gap),b.w,b.d,b.h)}
+    else if(b.kind==='shell'){
+      const n=b.inner;box(g,n.x,n.y,0,n.w,n.d,n.h);
+      const s=el('g',{class:'shell'},g);top=box(s,b.x,b.y,0,b.w,b.d,b.h);
+      top=[P(n.x,n.y,n.h),P(n.x+n.w,n.y,n.h),P(n.x+n.w,n.y+n.d,n.h),P(n.x,n.y+n.d,n.h)];
+    }
+    else top=box(g,b.x,b.y,0,b.w,b.d,b.h);
+    const cx=top.reduce((s,p)=>s+p[0],0)/4, cy=top.reduce((s,p)=>s+p[1],0)/4;
+    const label=b.code||b.id;
+    const t=el('text',{class:'code',x:cx.toFixed(1),y:(cy+3).toFixed(1),'text-anchor':'middle'},g);t.textContent=label;
+    if(scene.inside){const ft=foot(b);floorText(g,ft[0],ft[3]+.75,b.name.toUpperCase(),'flabel')}
+    if(b.flagged){const [fx,fy]=P(b.x+b.w,b.y,b.h);el('rect',{class:'flag',x:fx-2,y:fy-14,width:11,height:11},g);const ft=el('text',{class:'flagt',x:fx+3.5,y:fy-5.6,'text-anchor':'middle'},g);ft.textContent='!'}
+    g.addEventListener('click',e=>{if(dragged)return;e.stopPropagation();select(b.id)});
+    g.addEventListener('dblclick',e=>{e.stopPropagation();if(byId[b.id]&&byId[b.id].inside&&!scene.inside)goInside(b.id)});
+    g.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse')showTip(b,e)});
+    g.addEventListener('pointermove',e=>{if(e.pointerType==='mouse')moveTip(e)});
+    g.addEventListener('pointerleave',()=>tip.hidden=true);
+    blockEls[b.id]=g;
+  }
+  // flows
+  flowsLive=scene.flows.map((fl,fi)=>{
+    const hops=fl.hops.map(([a,b,snip])=>({a,b,snip,...samples(sb,a,b)}));
+    const dot=el('g',{class:'dot'},dotsG);
+    el('circle',{class:'hit',r:11},dot);el('circle',{class:'halo',r:8},dot);el('circle',{class:'core',r:3.2},dot);
+    const live={fl,hops,dot,i:fi%hops.length,t:reduce?.5:Math.random(),wait:0};
+    if(scene.inside){live.i=0;live.t=0}
+    dot.addEventListener('click',e=>{if(dragged)return;e.stopPropagation();selectDot(live)});
+    dot.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse'){tip.innerHTML=`<b>${esc(fl.name)}</b>Data in flight. Click to read the snippet.`;tip.hidden=false;moveTip(e)}});
+    dot.addEventListener('pointermove',e=>{if(e.pointerType==='mouse')moveTip(e)});
+    dot.addEventListener('pointerleave',()=>tip.hidden=true);
+    return live;
+  });
+  flowsLive.forEach(drawDot);
+  markSel();
+}
+
+function samples(sb,a,b){
+  const A=sb[a],Bk=sb[b];
+  let mode='xy',rev=false,found=scene.edges.find(e=>e[0]===a&&e[1]===b);
+  if(!found){found=scene.edges.find(e=>e[0]===b&&e[1]===a);rev=true}
+  if(found)mode=found[2];
+  let r=rev?route(Bk,A,mode).reverse():route(A,Bk,mode);
+  const inF=(q,blk,pad)=>{const f=foot(blk);return q[0]>f[0]-pad&&q[0]<f[2]+pad&&q[1]>f[1]-pad&&q[1]<f[3]+pad};
+  const st=.12, all=[];
+  for(let i=0;i<r.length-1;i++){
+    const [x1,y1]=r[i],[x2,y2]=r[i+1],L=Math.hypot(x2-x1,y2-y1),n=Math.max(1,Math.ceil(L/st));
+    for(let j=0;j<n;j++)all.push([x1+(x2-x1)*j/n,y1+(y2-y1)*j/n]);
+  }
+  all.push(r[r.length-1]);
+  // keep the longest run outside both end footprints
+  let best=[],cur=[];
+  for(const q of all){if(inF(q,A,.15)||inF(q,Bk,.15)){if(cur.length>best.length)best=cur;cur=[]}else cur.push(q)}
+  if(cur.length>best.length)best=cur;
+  if(best.length<2)best=[all[0],all[all.length-1]];
+  return{pts:best.map(q=>P(q[0],q[1])),len:best.length*st};
+}
+
+function drawDot(f){
+  const h=f.hops[f.i];
+  if(f.wait>0&&!(selDot===f)){f.dot.setAttribute('opacity','0');return}
+  const n=h.pts.length-1, pos=Math.min(n,f.t*n), k=Math.floor(pos), r=pos-k;
+  const p=h.pts[k],q=h.pts[Math.min(n,k+1)];
+  f.dot.setAttribute('opacity','1');
+  f.dot.setAttribute('transform',`translate(${(p[0]+(q[0]-p[0])*r).toFixed(1)} ${(p[1]+(q[1]-p[1])*r).toFixed(1)})`);
+}
+function pulse(id){const g=blockEls[id];if(!g||reduce)return;g.classList.add('hit');setTimeout(()=>g.classList.remove('hit'),420)}
+
+const SPEED=7;
+function advance(f,dt){
+  if(f.wait>0){f.wait-=dt;return}
+  const h=f.hops[f.i];
+  f.t+=dt*SPEED/Math.max(1,h.len);
+  if(f.t>=1){
+    pulse(h.b);
+    f.i=(f.i+1)%f.hops.length;f.t=0;
+    f.wait=f.i===0?1.4:.42;
+    if(selDot===f){f.wait=.42;renderPanel()}
+  }
+}
+let last=0;
+function tick(ts){
+  const dt=Math.min(.05,(ts-last)/1000||0);last=ts;
+  if(playing)flowsLive.forEach(f=>advance(f,dt));
+  flowsLive.forEach(drawDot);
+  requestAnimationFrame(tick);
+}
+
+/* selection & panel */
+function markSel(){
+  for(const id in blockEls)blockEls[id].classList.toggle('sel',id===sel);
+  flowsLive.forEach(f=>f.dot.classList.toggle('sel',f===selDot));
+  edgeEls.forEach(e=>e.el.classList.toggle('lit',!!selDot&&(()=>{const h=selDot.hops[selDot.i];return(e.a===h.a&&e.b===h.b)||(e.a===h.b&&e.b===h.a)})()));
+  document.querySelectorAll('.item').forEach(it=>it.classList.toggle('on',it.dataset.id===(scene.inside?scene.owner.id:sel)));
+}
+function select(id){sel=id;selDot=null;markSel();renderPanel()}
+function selectDot(f){selDot=f;sel=null;markSel();renderPanel()}
+const blockIn=id=>scene.blocks.find(b=>b.id===id);
+
+function condHTML(ids){return ids.map(c=>`<div class="cond"><b>${esc(COND[c][0])}</b><span>${esc(COND[c][1])}</span></div>`).join('')}
+function kv(rows){return'<dl class="kv">'+rows.filter(r=>r[1]).map(r=>`<dt>${r[0]}</dt><dd>${esc(r[1])}</dd>`).join('')+'</dl>'}
+
+function renderPanel(){
+  const body=$('body');let h='';
+  $('tWhat').setAttribute('aria-selected',tab==='what');$('tHow').setAttribute('aria-selected',tab==='how');
+  if(selDot){
+    const f=selDot,hp=f.hops[f.i],sb=Object.fromEntries(scene.blocks.map(b=>[b.id,b]));
+    const nm=id=>sb[id].name;
+    h+=`<div class="lab">Data in flight</div><h1>${esc(f.fl.name)}</h1><p class="sub">hop ${f.i+1} of ${f.hops.length} · ${esc(nm(hp.a))} → ${esc(nm(hp.b))}</p>`;
+    h+=`<h2>The snippet</h2><pre class="snip">${esc(hp.snip)}</pre>`;
+    h+=`<h2>${tab==='what'?'Every hop':'Route'}</h2><ol class="steps">`+f.hops.map((x,i)=>`<li><button data-hop="${i}" class="${i===f.i?'on':''}"><span class="k">${String(i+1).padStart(2,'0')}</span><span>${esc(nm(x.a))} → ${esc(nm(x.b))}${tab==='how'?'<br><span style="opacity:.75">'+esc(x.snip.split('\n')[0])+'</span>':''}</span></button></li>`).join('')+'</ol>';
+    h+=`<p>Press <button class="inline" data-act="step">Trace one step</button> to walk it hop by hop.</p>`;
+  } else if(scene.inside && sel){
+    const b=blockIn(sel),s=b.step;
+    h+=`<div class="lab">${esc(scene.owner.name)} · step ${b.idx+1} of ${scene.blocks.length}</div><h1>${esc(s.name)}</h1><p class="sub">inside ${esc(scene.owner.name)}</p>`;
+    h+= tab==='what'?`<h2>What happens</h2><p>${s.desc}</p>`:`<h2>From the config</h2><pre class="snip">${esc(s.snip)}</pre>`;
+    if(tab==='what')h+=`<pre class="snip">${esc(s.snip)}</pre>`;
+    h+=stepList();
+  } else if(scene.inside){
+    const o=scene.owner;
+    h+=`<div class="lab">Inside</div><h1>${esc(o.name)}</h1><p class="sub">${esc(o.sub||'')}</p>`;
+    h+=`<h2>Steps in execution</h2><p>The dot walks these in order and loops. Click a step, or use ↓ ↑.</p>`+stepList();
+    h+=`<p><button class="inline" data-act="out">← Come back out</button></p>`;
+  } else if(sel){
+    const b=byId[sel];
+    const grp=GROUPS.find(g=>g[0]===b.g)[1];
+    h+=`<div class="lab">${esc(grp)}${b.host==='pi'?' · on the Pi':''}</div><h1>${esc(b.name)}</h1><p class="sub">${esc(b.sub||'')}</p>`;
+    if(tab==='what'){
+      h+=`<h2>What this is</h2>`+b.what.map(p=>`<p>${p}</p>`).join('');
+      const links=scene.edges.filter(e=>e[0]===b.id||e[1]===b.id).map(e=>e[0]===b.id?e[1]:e[0]);
+      if(links.length)h+=`<h2>Connects to</h2><div class="links">`+[...new Set(links)].map(id=>`<button data-go="${id}">${esc(id)} · ${esc(byId[id].name)}</button>`).join('')+'</div>';
+      if(b.inside)h+=`<p><button class="inline" data-act="in">→ goes inside</button> to see its ${b.inside.length} steps in execution.</p>`;
+      if(b.cond&&b.cond.length)h+=`<h2>Condition</h2>`+condHTML(b.cond);
+    } else {
+      const w=b.how||{};
+      h+=`<h2>Where it lives</h2>`+kv([['Files',w.file],['Images',w.image],['Ports',w.ports],['Containers',b.n!=='—'?b.n:'']]);
+      if(w.snip)h+=`<h2>From the config</h2><pre class="snip">${esc(w.snip)}</pre>`;
+      if(!w.file&&!w.snip)h+=`<p>Nothing in the repo configures this; it sits outside the house.</p>`;
+    }
+  } else {
+    h+=`<div class="lab">brokentari / home-server</div><h1>The Home Server</h1><p class="sub">how a request, a download and a backup move through nyx and the Pi</p>`;
+    if(tab==='what'){
+      h+=`<h2>What this is</h2>
+      <p>This repository is <mark>one Compose project per folder</mark> on nyx, an Intel NUC under the desk, plus a Raspberry Pi that runs DNS, passwords and the watchers. Every web-facing container joins one shared network so a single Caddy can reach it by name.</p>
+      <p>Read the map from the left. Requests enter through <mark>the front door</mark> (your devices, Tailscale, AdGuard, Caddy). The media line runs along the top right, your data through the middle, the disks along the bottom, and the copy that leaves the house sits off to the right in R2. The Pi floats above, on purpose: it is the part that is still awake when nyx isn’t.</p>
+      <p>Nearly every decision here is about <mark>what can’t be replaced</mark>. Movies can be downloaded again; photos, the vault and the finance database can’t. So databases stay on the NVMe, photos get parity, and only small irreplaceable data goes offsite.</p>
+      <h2>How to read it</h2>
+      <p>Hover anything for a plain description. The <button class="inline" data-act="how">How it’s built</button> tab gives the files and config behind it, and <span class="mk">Condition</span> lists what is currently wrong with it. A <button class="inline" data-act="in-C">→ goes inside</button> on a structure shows its steps in execution.</p>
+      <p>The moving dots are data: a DNS answer, a video stream, a photo, a backup. Click one to read the snippet it carries, then <button class="inline" data-act="step">Trace one step</button> to follow it hop by hop.</p>
+      <h2>Condition</h2>`+condHTML(['disk3','ups','sd','picaddy','old','kernel']);
+    } else {
+      h+=`<h2>The folders</h2><table class="folders"><tbody>`+FOLDERS.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td class="n">${r[2]}</td></tr>`).join('')+`</tbody></table>`;
+      h+=`<h2>Shared network</h2><pre class="snip">docker network create --subnet <docker-subnet> arr_network\n# fixed subnet: a firewall rule in media/ depends on it</pre>`;
+      h+=`<h2>Start order</h2><pre class="snip">for s in proxy media immich cloud gitea firefly apps dashboard diun; do\n  (cd ~/home-server/$s && docker compose up -d --build)\ndone</pre>`;
+      h+=`<h2>Adding an app</h2><p>Create its A record in Cloudflare, add a <code>handle</code> block to <code>proxy/Caddyfile</code>, reload Caddy, and add an Uptime Kuma monitor. The wildcard cert and AdGuard’s wildcard answer already cover it.</p>`;
+      h+=`<h2>Secrets</h2><p>The repo is an allowlist: configs only, never <code>.env</code>, secrets or data. Each stack ships a <code>*.env.example</code> with the values removed.</p>`;
+    }
+  }
+  body.innerHTML=h;body.scrollTop=body.scrollTop;
+  body.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{select(b.dataset.go);centerOn(b.dataset.go)});
+  body.querySelectorAll('[data-hop]').forEach(b=>b.onclick=()=>{playing=false;syncPlay();selDot.i=+b.dataset.hop;selDot.t=.5;selDot.wait=0;markSel();renderPanel()});
+  body.querySelectorAll('[data-step]').forEach(b=>b.onclick=()=>select(b.dataset.step));
+  body.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>{
+    const a=b.dataset.act;
+    if(a==='step')traceStep();else if(a==='out')comeOut();else if(a==='in')goInside(sel);
+    else if(a==='in-C')goInside('C');else if(a==='how'){tab='how';renderPanel()}
+  });
+}
+function stepList(){
+  return'<ol class="steps">'+scene.blocks.map(b=>`<li><button data-step="${b.id}" class="${b.id===sel?'on':''}"><span class="k">${String(b.idx+1).padStart(2,'0')}</span><span>${esc(b.name)}</span></button></li>`).join('')+'</ol>';
+}
+
+/* side index & stats */
+function buildSide(){
+  const side=$('side');let h='';
+  for(const [g,label] of GROUPS){
+    h+=`<div class="grp lab">${esc(label)}</div>`;
+    let apps=false;
+    for(const b of B.filter(b=>b.g===g)){
+      if(b.sub2==='apps'&&!apps){apps=true;h+=`<div class="sublab">apps/ · small apps</div>`}
+      h+=`<button class="item${b.sub2?' sub':''}" data-id="${b.id}"><span class="c">${esc(b.id)}</span><span>${esc(b.name)}</span><span class="n">${esc(b.n)}</span></button>`;
+    }
+  }
+  side.innerHTML=h;
+  side.querySelectorAll('.item').forEach(it=>it.onclick=()=>{
+    const id=it.dataset.id;
+    if(scene.inside)comeOut(false);
+    select(id);centerOn(id);
+  });
+  $('stats').innerHTML=STATS.map(([k,v])=>`<div class="stat"><span class="lab">${esc(k)}</span><b>${esc(v)}</b></div>`).join('');
+}
+
+/* inside / outside */
+function goInside(id){
+  const b=byId[id];if(!b||!b.inside)return;
+  scene=stepScene(b);sel=null;selDot=null;
+  $('crumb').hidden=false;$('crumbPath').textContent='nyx / '+b.name;
+  render();fit();renderPanel();markSel();
+}
+function comeOut(re=true){
+  if(!scene.inside)return;
+  const owner=scene.owner.id;
+  scene=MAIN;$('crumb').hidden=true;selDot=null;sel=owner;
+  render();fit();if(re){renderPanel()}markSel();
+}
+
+/* controls */
+function syncPlay(){const b=$('play');b.textContent=playing?'❚❚ Pause the flow':'▶ Resume the flow';b.setAttribute('aria-pressed',playing)}
+$('play').onclick=()=>{playing=!playing;syncPlay()};
+function traceStep(){
+  playing=false;syncPlay();
+  let f=selDot||flowsLive[0];
+  if(!selDot){selDot=f;sel=null}
+  else{pulse(f.hops[f.i].b);f.i=(f.i+1)%f.hops.length}
+  f.t=.55;f.wait=0;markSel();renderPanel();drawDot(f);
+}
+$('step').onclick=traceStep;
+$('reset').onclick=()=>{if(scene.inside)comeOut(false);sel=null;selDot=null;markSel();fit();renderPanel()};
+$('out').onclick=()=>comeOut();
+$('tWhat').onclick=()=>{tab='what';renderPanel()};
+$('tHow').onclick=()=>{tab='how';renderPanel()};
+
+/* pan & zoom */
+function applyView(){world.setAttribute('transform',`translate(${view.tx.toFixed(1)} ${view.ty.toFixed(1)}) scale(${view.k.toFixed(4)})`)}
+function size(){const r=stage.getBoundingClientRect();svg.setAttribute('viewBox',`0 0 ${r.width} ${r.height}`);return r}
+function fit(){
+  const r=size();const bb=(document.getElementById('fitg')||content).getBBox();
+  const padX=Math.min(60,r.width*.06),padTop=54,padBot=40;
+  const k=Math.min((r.width-padX*2)/bb.width,(r.height-padTop-padBot)/bb.height,2.2);
+  view={k,tx:r.width/2-(bb.x+bb.width/2)*k,ty:padTop+(r.height-padTop-padBot)/2-(bb.y+bb.height/2)*k};applyView();
+}
+function zoomAt(f,cx,cy){const k=Math.max(.25,Math.min(5,view.k*f));const s=k/view.k;view.tx=cx-(cx-view.tx)*s;view.ty=cy-(cy-view.ty)*s;view.k=k;applyView()}
+function centerOn(id){
+  const g=blockEls[id];if(!g)return;const bb=g.getBBox(),r=stage.getBoundingClientRect();
+  const k=Math.max(view.k,1);view.k=k;view.tx=r.width/2-(bb.x+bb.width/2)*k;view.ty=r.height/2-(bb.y+bb.height/2)*k;applyView();
+}
+$('zin').onclick=()=>{const r=stage.getBoundingClientRect();zoomAt(1.25,r.width/2,r.height/2)};
+$('zout').onclick=()=>{const r=stage.getBoundingClientRect();zoomAt(.8,r.width/2,r.height/2)};
+stage.addEventListener('wheel',e=>{e.preventDefault();const r=stage.getBoundingClientRect();zoomAt(Math.exp(-e.deltaY*.0015),e.clientX-r.left,e.clientY-r.top)},{passive:false});
+
+const ptrs=new Map();let dragged=false,start=null,pinch=null;
+stage.addEventListener('pointerdown',e=>{
+  if(e.target.closest('.btn,.crumb,.zoom'))return;
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});dragged=false;
+  start={x:e.clientX,y:e.clientY,tx:view.tx,ty:view.ty};
+  if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y),k:view.k}}
+});
+stage.addEventListener('pointermove',e=>{
+  if(!ptrs.has(e.pointerId))return;
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size===2&&pinch){
+    const [a,b]=[...ptrs.values()],r=stage.getBoundingClientRect();
+    const d=Math.hypot(a.x-b.x,a.y-b.y);zoomAt((pinch.k*d/pinch.d)/view.k,(a.x+b.x)/2-r.left,(a.y+b.y)/2-r.top);dragged=true;return;
+  }
+  const dx=e.clientX-start.x,dy=e.clientY-start.y;
+  if(!dragged&&Math.hypot(dx,dy)>5){dragged=true;stage.classList.add('drag');tip.hidden=true;try{stage.setPointerCapture(e.pointerId)}catch(_){}}
+  if(dragged){view.tx=start.tx+dx;view.ty=start.ty+dy;applyView()}
+});
+const up=e=>{ptrs.delete(e.pointerId);if(ptrs.size<2)pinch=null;stage.classList.remove('drag');setTimeout(()=>dragged=false,0)};
+stage.addEventListener('pointerup',up);stage.addEventListener('pointercancel',up);
+svg.addEventListener('click',e=>{if(dragged)return;if(e.target===svg||e.target.closest('.grid,.plate')||e.target.tagName==='svg'){sel=null;selDot=null;markSel();renderPanel()}});
+
+function showTip(b,e){tip.innerHTML=`<b>${esc(b.code?b.name:b.id+' · '+b.name)}</b>${esc(b.hover||(b.step?b.step.desc.replace(/<[^>]+>/g,''):''))}`;tip.hidden=false;moveTip(e)}
+function moveTip(e){const r=stage.getBoundingClientRect();let x=e.clientX-r.left+14,y=e.clientY-r.top+14;if(x+290>r.width)x=e.clientX-r.left-290;if(y+90>r.height)y=e.clientY-r.top-90;tip.style.left=x+'px';tip.style.top=y+'px'}
+
+/* keyboard: ↑↓ move, → inside, ← out */
+document.addEventListener('keydown',e=>{
+  if(e.target.closest&&e.target.closest('input,textarea'))return;
+  const ord=scene.order;
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    e.preventDefault();let i=ord.indexOf(sel);
+    i=i<0?0:(i+(e.key==='ArrowDown'?1:-1)+ord.length)%ord.length;select(ord[i]);
+    if(!scene.inside)document.querySelector(`.item[data-id="${ord[i]}"]`)?.scrollIntoView({block:'nearest'});
+  } else if(e.key==='ArrowRight'||e.key==='Enter'){if(!scene.inside&&sel&&byId[sel].inside){e.preventDefault();goInside(sel)}}
+  else if(e.key==='ArrowLeft'||e.key==='Escape'){if(scene.inside){e.preventDefault();comeOut()}}
+});
+
+/* boot */
+buildSide();syncPlay();render();fit();renderPanel();
+new ResizeObserver(()=>fit()).observe(stage);
+requestAnimationFrame(tick);
+})();
+</script>
+
+</body>
+</html>

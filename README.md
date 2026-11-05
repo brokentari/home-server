@@ -18,6 +18,7 @@ repo; this one only has the hooks for it (a Caddy import, Homepage labels, backu
 | `diun/`   | Diun: weekly new-image notices to ntfy       | -                            |
 | `auth/`   | Authelia: sign-in (password + 2FA) for apps without their own | `auth.`     |
 | `admin/`  | Dozzle (logs), Scrutiny (disk health), Backrest (browse/restore backups), behind Authelia | `logs.`, `disks.`, `backups.` |
+| `docs/`   | Interactive map of the setup (GitHub Pages)  | [brokentari.github.io/home-server](https://brokentari.github.io/home-server/) |
 | `scripts/` | Backups, SnapRAID job, ntfy helpers, root setup, `update.sh` | -           |
 
 The Raspberry Pi (`raspberrypi`, 192.168.50.143) runs Vaultwarden (`vw.`), Uptime Kuma (`kuma.`,
